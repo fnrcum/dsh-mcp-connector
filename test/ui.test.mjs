@@ -123,13 +123,19 @@ test('宿主原生面板填满 main 区域，兼容弹窗和截图 harness 保�
   assert.doesNotMatch(harnessSource, /new Set\(\['qcc-company'\]\)/);
 });
 
-test('界面固定为中文且不提供语言切换入口', () => {
+test('界面默认中文，提供语言切换入口并支持中英双语', () => {
   assert.match(uiSource, /<html lang="zh-CN">/);
-  assert.doesNotMatch(uiSource, /id="locale-toggle"/);
-  assert.doesNotMatch(uiSource, /mcp-connector:locale/);
-  assert.doesNotMatch(uiSource, /Switch language|>EN<\/button>|Sending…/);
-  assert.doesNotMatch(uiSource, /data-i18n/);
-  assert.match(uiSource, /const LABELS = \{[\s\S]*?details: '详情'/);
+  assert.match(uiSource, /id="lang-select"/);
+  assert.match(uiSource, /<option value="zh">中文<\/option>/);
+  assert.match(uiSource, /<option value="en">English<\/option>/);
+  assert.match(uiSource, /function setLang\(next\)/);
+  assert.match(uiSource, /function applyStaticI18n\(\)/);
+  assert.match(uiSource, /const I18N_LABELS = \{/);
+  assert.match(uiSource, /zh:\s*\{[\s\S]*?details: '详情'/);
+  assert.match(uiSource, /en:\s*\{[\s\S]*?details: 'Details'/);
+  assert.match(uiSource, /const I18N_FRAGMENTS = \[/);
+  assert.match(uiSource, /function L\(input\)/);
+  assert.match(uiSource, /localStorage\.getItem\('mcpConnectorLang'\)/);
 });
 
 test('目录刷新文案与插件升级明确区分', () => {
@@ -444,7 +450,7 @@ test('关闭社区入口后在本次页面生命周期内保持隐藏', () => {
 });
 
 test('工具清单使用中文计数并标记服务商弃用工具', () => {
-  assert.match(uiSource, /\$\('#tools-summary'\)\.textContent = `\$\{detailToolServers\.length\} 个服务 · \$\{totalTools\} 个工具`/);
+  assert.match(uiSource, /\$\('#tools-summary'\)\.textContent = L\(`\$\{detailToolServers\.length\} 个服务 · \$\{totalTools\} 个工具`\)/);
   assert.match(uiSource, /function isDeprecatedTool\(tool\)/);
   assert.match(uiSource, /deprecated/);
   assert.match(uiSource, /已弃用\|已废弃\|不再推荐/);
