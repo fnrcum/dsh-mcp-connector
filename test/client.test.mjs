@@ -821,11 +821,13 @@ test('从设置快捷打开时弹框 Portal 到 body 并高于 DSH 设置层', a
 
 test('版本检查支持强制刷新且不会被旧缓存隐藏 Provider 更新', async () => {
   for (const failed of [false, true]) {
+    // 数组按组件里 useState 的出现顺序排列。manualCommandVisible 插在
+    // manualCommandCopied 与 versionCheckRequest 之间，因此下游 ordinal 顺延一位。
     const state = [
       { installedVersion: '0.2.54', latestVersion: '0.2.54', updateAvailable: false, checkedAt: '2026-09-22T00:00:00Z' },
       'ready', { provider: { label: '市场' } },
       { installedVersion: '0.2.54', latestVersion: '0.2.56', updateAvailable: true },
-      null, null, null, false, false, false, false, 0, false, failed,
+      null, null, null, false, false, false, false, false, 0, false, failed,
     ];
     let cursor = 0;
     let refresh = 0;
@@ -836,7 +838,7 @@ test('版本检查支持强制刷新且不会被旧缓存隐藏 Provider 更新'
         useState(initial) {
           const index = cursor++;
           return [index in state ? state[index] : initial, (value) => {
-            if (index === 11) refresh = value(refresh);
+            if (index === 12) refresh = value(refresh);
           }];
         },
         useRef: (current) => ({ current }), useEffect() {},

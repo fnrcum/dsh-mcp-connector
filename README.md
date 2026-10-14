@@ -162,11 +162,24 @@ Bundle 默认配置位于 `cordis.patch.yml`：
     refreshSkewMs: 300000
     openBrowser: true
     showSidebarEntry: true
+    frameAncestors: ['self']
 ```
 
 `catalogUrl` 默认通过 jsDelivr CDN 读取公共 [dsh-mcp-connector-registry](https://github.com/duhu2000/dsh-mcp-connector-registry)，支持 ETag/TTL 缓存；主源失败时自动尝试 GitHub raw 备用源，再回退到上次缓存或随包内置目录。jsDelivr 的分支 URL 可能存在缓存延迟，因此 Registry 合并后的新卡片不保证秒级出现。需要离线/私有模式时可将 `catalogUrl` 显式设为空字符串；显式配置其他目录 URL 时不会自动切换到公共备用源。
 
+远程目录请求（包括备用源）支持 `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY` 及其小写形式；同时存在时小写变量优先，未设置 `HTTPS_PROXY` 时 HTTPS 请求使用 `HTTP_PROXY`。代理地址须为 HTTP(S) URL；需要直连的目标可加入 `NO_PROXY`（例如 `localhost,127.0.0.1`）。Node.js 20+ 无需添加 `--use-env-proxy`；此行为不会修改 Host 的全局 fetch dispatcher 或 MCP 传输配置。
+
+代理变量必须存在于正在运行的 DSH 进程中。修改后请完全退出并重启 DSH Desktop，或从已设置变量的终端启动 `dsh web`；修改 Windows 用户环境变量不会更新已有进程。连接器不会读取系统代理设置，也不会猜测本机代理地址。
+
 `showSidebarEntry` 默认为 `true`。用户可在 DSH 插件配置页覆盖该值；关闭后只隐藏侧边栏快捷入口，不停用连接器、已连接 MCP Server 或工具。
+
+`frameAncestors` 默认为 `['self']`，即面板页面（`/mcp-connector/ui/`）的 CSP 只允许同源页面内嵌，是既有行为，不做任何放宽。在桌面壳（Tauri/Electron）里把面板嵌进壳窗口时，祖先源与面板自身不同源，浏览器会以 `Framing '...' violates the following Content Security Policy directive: "frame-ancestors 'self'"` 拦截并导致面板白屏；此时需要由部署方/用户显式追加外壳源：
+
+```yaml
+frameAncestors: ['self', 'http://tauri.localhost', 'tauri://localhost']
+```
+
+这是有意的安全取舍，不是遗漏：`frame-ancestors` 无法验证嵌入方到底是谁，所以插件不会默认把 Tauri 之类的外壳源硬编码进去——写进白名单就等于允许任何跑在该源上的页面内嵌本机面板。取值只接受 CSP 关键字（`self` / `none` / `*`）与 host-source（`https://*.example.com`、`127.0.0.1:3080`、`tauri://localhost`、`http://tauri.localhost:1420` 等，可带 scheme、端口与路径）；含 `;`、逗号、空格或 `'unsafe-inline'` 一类非 host-source 关键字的值会被整条丢弃（避免 CSP 头注入），过滤后为空则回退 `['self']`，而不是放行任意源。请只填自己信任的源。
 
 ## 兼容性与责任边界
 
@@ -197,7 +210,7 @@ npm run dev:ui
 
 公共 Registry 每次合并后会生成 `catalog-stats.json`；本仓库的定时工作流每小时同步中英文介绍和统计快照。npm 页面中的静态正文随版本发布更新，上方动态统计徽标则直接读取 Registry，可在不发布新 npm 版本时保持实时数量一致。
 
-当前公开版本为 [`dsh-mcp-connector@0.2.70`](https://www.npmjs.com/package/dsh-mcp-connector)，对应 [GitHub Release v0.2.70](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.70)。
+当前公开版本为 [`dsh-mcp-connector@0.2.72`](https://www.npmjs.com/package/dsh-mcp-connector)，对应 [GitHub Release v0.2.72](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.72)。
 
 版本能力与变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 Desktop 发版回归见 [docs/DESKTOP-E2E.md](docs/DESKTOP-E2E.md)。

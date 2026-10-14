@@ -21,8 +21,9 @@ test('仅升级精确匹配的旧市场桥接，不覆盖用户自定义命令',
     '--yes', '--legacy-peer-deps', '--package', 'dsh-mcp-connector@0.2.48',
     '--package', 'dingtalk-workspace-cli@1.0.61', 'dsh-mcp-cli-bridge', '--provider', 'dingtalk-dws',
   ] };
-  assert.ok(cliBridgeArgs(record).includes('dsh-mcp-connector@0.2.55'));
-  assert.ok(cliBridgeArgs({ ...record, args: record.args.map((arg) => arg.replace('@0.2.48', '@0.2.49')) }).includes('dsh-mcp-connector@0.2.55'));
+  for (const version of ['0.2.48', '0.2.49', '0.2.55']) {
+    assert.ok(cliBridgeArgs({ ...record, args: record.args.map((arg) => arg.replace('0.2.48', version)) }).includes('dsh-mcp-connector@0.2.71'));
+  }
   assert.ok(record.args.includes('dsh-mcp-connector@0.2.48'));
   for (const changed of [{ connectorId: 'custom' }, { command: '/custom/npx' }, { args: [...record.args, '--custom'] }]) {
     const custom = { ...record, ...changed };
@@ -47,6 +48,14 @@ test('Windows 解析全局及 npx 官方包，保留带空格绝对路径，不�
       const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) =>
         !['path', 'node_test_context', 'node_options'].includes(key.toLowerCase()))), Path: `;relative;"${bin}"` };
       assert.equal(resolveCliExecutable('dws', { platform: 'win32', env }), realpathSync(native));
+      for (const entry of ['./bin/dws.js', 'bin/dws.js']) {
+        writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'dingtalk-workspace-cli', bin: { dws: entry } }));
+        assert.equal(resolveCliExecutable('dws', { platform: 'win32', env }), realpathSync(native));
+      }
+      for (const entry of ['../bin/dws.js', './other/../bin/dws.js', '/bin/dws.js', 'bin/other.js']) {
+        writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'dingtalk-workspace-cli', bin: { dws: entry } }));
+        assert.throws(() => resolveCliExecutable('dws', { platform: 'win32', env }), /CLI_NATIVE_MISSING/);
+      }
       assert.equal(buildCliPreflightInvocation('dingtalk-dws', { executable: native }).command, native);
       writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'not-the-approved-provider', bin: { dws: 'bin/dws.js' } }));
       assert.throws(() => resolveCliExecutable('dws', { platform: 'win32', env }), /CLI_NATIVE_MISSING/);

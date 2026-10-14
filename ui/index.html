@@ -387,6 +387,16 @@
     transition: border-color .15s;
   }
   .modal input:focus, .modal textarea:focus, .modal select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+  /* 页面内确认框（替代原生 confirm）。原生 confirm 在桌面壳里走 Win32 TaskDialog，
+     关闭后不会把键盘焦点还给页面，用户必须切一次窗口才能继续输入；因此所有确认
+     都改走这里。z-index 高于 .modal(200)，因为多处确认是在模态内部触发的。 */
+  .confirm-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.52); display: none; align-items: center; justify-content: center; z-index: 300; }
+  .confirm-mask.show { display: flex; }
+  .confirm-box { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 24px; width: 460px; max-width: 92vw; box-shadow: var(--shadow-lg); }
+  .confirm-box h3 { margin: 0 0 12px; font-size: 15px; }
+  .confirm-message { margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+  .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
   .modal .m-actions {
     position: sticky; bottom: 0; z-index: 2;
     display: flex; gap: 8px; justify-content: flex-end;
@@ -515,6 +525,17 @@
 
 <div class="modal-mask" id="modalMask" aria-hidden="true">
   <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div>
+</div>
+
+<div class="confirm-mask" id="confirmMask" aria-hidden="true">
+  <div class="confirm-box" id="confirmBox" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+    <h3 id="confirm-title"></h3>
+    <p class="confirm-message" id="confirm-message"></p>
+    <div class="confirm-actions">
+      <button class="btn ghost" type="button" id="confirm-cancel"></button>
+      <button class="btn" type="button" id="confirm-ok"></button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -963,7 +984,23 @@
     [">连接</button>", ">Connect</button>"],
     ["· 显示 ", "· showing "],
     ["关闭社区入口", "Close community panel"],
-    ["最近成功：", "Last success: "]
+    ["最近成功：", "Last success: "],
+    ["请确认", "Please confirm"],
+    ["应用治理策略", "Apply governance policy"],
+    ["应用", "Apply"],
+    ["恢复策略历史", "Restore policy history"],
+    ["变更连接范围", "Change connection scope"],
+    ["回滚连接范围", "Roll back connection scope"],
+    ["回滚", "Roll back"],
+    ["按会话启用", "Enable per session"],
+    ["恢复配置快照", "Restore configuration snapshot"],
+    ["迁移旧授权", "Migrate legacy authorization"],
+    ["🔄 重新连接", "🔄 Reconnect"],
+    ["重新连接", "Reconnect"],
+    ["重新建立 Host 侧条目并复检：不改配置、凭据、范围或注入模式", "Re-establish the Host-side entry and recheck it: configuration, credentials, scope, and injection mode are unchanged"],
+    ["扫描企查查旧 OAuth 插件；不会删除旧插件或原凭据", "Scan for the legacy Qichacha OAuth plugin; the old plugin and original credentials are not deleted"],
+    ["检测企查查旧授权", "Detect legacy Qichacha authorization"],
+    ["断开连接", "Disconnect"]
   ];
   I18N_FRAGMENTS.sort((a, b) => b[0].length - a[0].length);
   function L(input) {
@@ -1014,7 +1051,6 @@
     $('#detail-disconnect-btn').textContent = t('disconnectBtn');
     if (typeof syncTabs === 'function') syncTabs();
   }
-
   const MCP_JSON_EXAMPLE = JSON.stringify({
     mcpServers: {
       'my-server': {
@@ -1049,6 +1085,8 @@
   let detailGovernance = null;
   let detailNeedsReconfigure = false;
   let detailFailureState = '';
+  // 状态未知且已有连接记录时，详情主按钮改为「重新连接」并按 key 触发一次重新建连
+  let detailReconnectKey = '';
   let toolRenderLimit = 50;
   let detailLoadId = 0;
   const MARKET_SECTION_PREVIEW_LIMIT = 4;
@@ -1070,6 +1108,74 @@
   let scopeRollbackRevision = null;
   let pendingScopeKey = null;
   let installedItems = [];
+
+  // Same-tab memory only: no credentials, modal contents or API responses are retained.
+  // The Host owns this memory across iframe unmounts; reloading the Host clears it.
+  const viewStateMemory = (() => {
+    try {
+      const host = window.parent;
+      if (host.location.origin !== window.location.origin) return new Map();
+      const key = '__mcpConnectorViewStateV1';
+      if (!(host[key] instanceof host.Map)) host[key] = new host.Map();
+      return host[key];
+    } catch { return new Map(); }
+  })();
+  let viewStateReady = window.parent === window;
+  let viewRenderSequence = 0;
+  let viewStateLoading = false;
+  let pendingViewScroll = null;
+
+  function normalizeViewState(value) {
+    const text = (s) => typeof s === 'string' ? s.slice(0, 500) : '';
+    const category = (s) => CATEGORIES.some((item) => item.value === s) ? s : '';
+    return {
+      view: ['market', 'installed', 'tools'].includes(value?.view) ? value.view : 'market',
+      search: text(value?.search),
+      category: category(value?.category),
+      expanded: Array.isArray(value?.expanded) ? [...new Set(value.expanded.map(category).filter(Boolean))] : [],
+      filter: { connectionKey: text(value?.filter?.connectionKey), serverName: text(value?.filter?.serverName),
+        status: ['', 'pending', 'unknown', 'success', 'failed'].includes(value?.filter?.status) ? value.filter.status : '' },
+      offset: Number.isSafeInteger(value?.offset) && value.offset >= 0 ? Math.min(value.offset, 100000) : 0,
+      scroll: Number.isFinite(value?.scroll) ? Math.max(0, Math.min(value.scroll, 10000000)) : 0,
+    };
+  }
+
+  function viewStateKey() { return JSON.stringify([currentWorkspace?.workspaceId ?? null]); }
+
+  function saveViewState() {
+    if (!viewStateReady || viewStateLoading) return;
+    const key = viewStateKey();
+    viewStateMemory.delete(key);
+    viewStateMemory.set(key, normalizeViewState({ view, search: searchQuery, category: marketCategory,
+      expanded: [...expandedMarketSections], filter: explorerFilter, offset: explorerOffset, scroll: main.scrollTop }));
+    while (viewStateMemory.size > 32) viewStateMemory.delete(viewStateMemory.keys().next().value);
+  }
+
+  function restoreViewState() {
+    const state = normalizeViewState(viewStateMemory.get(viewStateKey()));
+    view = state.view; searchQuery = state.search; searchInput.value = searchQuery;
+    marketCategory = state.category;
+    expandedMarketSections.clear(); state.expanded.forEach((value) => expandedMarketSections.add(value));
+    explorerFilter = state.filter; explorerOffset = state.offset;
+    pendingViewScroll = state.scroll;
+    syncTabs();
+  }
+
+  function beginViewRender() {
+    if (pendingViewScroll === null) saveViewState();
+    viewStateLoading = true;
+    return { sequence: ++viewRenderSequence, workspace: viewStateKey(), view };
+  }
+
+  function isViewRenderCurrent(render) {
+    return render.sequence === viewRenderSequence && render.workspace === viewStateKey() && render.view === view;
+  }
+
+  function finishViewRender(render) {
+    if (!isViewRenderCurrent(render)) return;
+    if (pendingViewScroll !== null) { main.scrollTop = pendingViewScroll; pendingViewScroll = null; }
+    viewStateLoading = false;
+  }
 
   async function call(method, params, { timeoutMs: timeoutOverride } = {}) {
     const controller = new AbortController();
@@ -1159,16 +1265,20 @@
       const workspace = event.data.workspace;
       const previousWorkspaceId = currentWorkspace?.workspaceId ?? null;
       const previousWorkspaceOptions = JSON.stringify(availableWorkspaces);
+      const firstContext = !viewStateReady;
+      saveViewState();
       currentWorkspace = workspace && typeof workspace.workspaceId === 'string'
         ? { workspaceId: workspace.workspaceId, title: String(workspace.title || workspace.workspaceId) }
         : null;
       updateAvailableWorkspaces(event.data.workspaces);
-      if ((currentWorkspace?.workspaceId ?? null) !== previousWorkspaceId || JSON.stringify(availableWorkspaces) !== previousWorkspaceOptions) {
+      if (firstContext || (currentWorkspace?.workspaceId ?? null) !== previousWorkspaceId || JSON.stringify(availableWorkspaces) !== previousWorkspaceOptions) {
         explorerSequence++; explorerDetailSequence++;
         explorerData = null; explorerOffset = 0;
         explorerFilter = { connectionKey: '', serverName: '', status: '' };
         closeModal(); closeDetail();
-        if (view === 'tools') main.innerHTML = '';
+        viewStateReady = true;
+        if (firstContext || (currentWorkspace?.workspaceId ?? null) !== previousWorkspaceId) restoreViewState();
+        main.innerHTML = '';
         refresh();
       }
       return;
@@ -1240,6 +1350,11 @@
     await refresh();
     if (!reloadOpenDetail || detailLoadId !== openDetailLoadId || !isDetailOpenFor(connectorId)) return;
     await window.__mcp.showDetail(connectorId);
+  }
+
+  // 详情主按钮：状态未知且已有连接记录时优先提供「重新连接」（Host 侧可能已放弃重连）
+  function detailTryLabel(fallback) {
+    return detailReconnectKey ? L('🔄 重新连接') : fallback;
   }
 
   function promptVariableNames(text) {
@@ -1370,7 +1485,11 @@
       select.disabled = false;
       return;
     }
-    if (!confirm(L(`${preview.message}。确认应用？`))) {
+    if (!await confirmDialog({
+      title: L('应用治理策略'),
+      message: L(`${preview.message}。确认应用？`),
+      confirmLabel: L('应用'),
+    })) {
       select.value = select.dataset.currentEffect || 'inherit';
       select.disabled = false;
       return;
@@ -1385,7 +1504,11 @@
   async function rollbackLatestPolicy() {
     const rollbackRevision = Number($('#policy-rollback').dataset.rollbackRevision);
     if (!Number.isInteger(rollbackRevision) || !detailGovernance) return;
-    if (!confirm(L(`确认恢复 revision=${rollbackRevision} 的策略内容？`))) return;
+    if (!await confirmDialog({
+      title: L('恢复策略历史'),
+      message: L(`确认恢复 revision=${rollbackRevision} 的策略内容？`),
+      confirmLabel: L('恢复'),
+    })) return;
     const result = await call('rollbackPolicy', { rollbackRevision, expectedRevision: detailGovernance.revision });
     showToast(result.message, result.ok);
     if (result.ok && detailConnector) await window.__mcp.showDetail(detailConnector.id);
@@ -1539,6 +1662,78 @@
   }
   $('#modalMask').addEventListener('click', (e) => { if (e.target.id === 'modalMask') closeModal(); });
 
+  /**
+   * 页面内确认框，替代原生 confirm()，返回 Promise<boolean>。
+   *
+   * 为什么必须换掉原生 confirm：桌面壳（Electron）里 confirm 走 Win32 TaskDialog，
+   * 关闭后 Electron 不会把键盘焦点还给渲染进程——document.hasFocus() 持续 false，
+   * 输入框点不中也打不了字，用户必须切一次窗口才能恢复。上游 electron#41602 已
+   * not_planned 关闭、修复 PR 未合并，所以只能在插件侧绕开。
+   *
+   * 注意 confirm 是同步返回布尔值的，自绘框必然异步，因此没有"覆盖 window.confirm"
+   * 这种省事做法（那样"取消"会永远失效），只能让调用点逐个 await。
+   *
+   * 复用独立的 #confirmMask 而不是现有 #modal：多处确认（范围变更、快照恢复等）
+   * 是在 #modal 内部触发的，复用会把正在填写的表单直接清空。
+   */
+  let activeConfirm = null;
+
+  function closeConfirm(result) {
+    if (!activeConfirm) return;
+    const pending = activeConfirm;
+    activeConfirm = null;
+    $('#confirmMask').classList.remove('show');
+    $('#confirmMask').setAttribute('aria-hidden', 'true');
+    // 焦点还给触发确认的元素，键盘位置不丢（原生框的失焦问题正在于此）。
+    if (pending.returnFocus?.isConnected !== false) pending.returnFocus?.focus?.();
+    pending.resolve(result);
+  }
+
+  function confirmDialog(options = {}) {
+    // 后到的确认先让前一个以"取消"收尾，避免它的 await 永远挂起。
+    if (activeConfirm) closeConfirm(false);
+    const {
+      title = '请确认',
+      message = '',
+      confirmLabel = '确认',
+      cancelLabel = '取消',
+    } = options;
+    const returnFocus = document.activeElement;
+    $('#confirm-title').textContent = title;
+    $('#confirm-message').textContent = message;
+    $('#confirm-ok').textContent = confirmLabel;
+    $('#confirm-cancel').textContent = cancelLabel;
+    $('#confirmMask').classList.add('show');
+    $('#confirmMask').setAttribute('aria-hidden', 'false');
+    const promise = new Promise((resolve) => { activeConfirm = { resolve, returnFocus }; });
+    $('#confirm-cancel')?.focus();
+    return promise;
+  }
+
+  $('#confirm-ok').addEventListener('click', () => closeConfirm(true));
+  $('#confirm-cancel').addEventListener('click', () => closeConfirm(false));
+  $('#confirmMask').addEventListener('click', (e) => { if (e.target.id === 'confirmMask') closeConfirm(false); });
+  $('#confirmMask').addEventListener('keydown', (e) => {
+    // 确认框打开时它是最外层，键事件不能漏给底下的模态（尤其是 Escape，否则会
+    // 把用户正在填写的表单一起关掉）。
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); closeConfirm(false); return; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      closeConfirm(document.activeElement === $('#confirm-ok'));
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    const focusable = [$('#confirm-cancel'), $('#confirm-ok')].filter((node) => node.disabled !== true);
+    if (!focusable.length) return;
+    e.preventDefault();
+    const index = focusable.indexOf(document.activeElement);
+    const step = e.shiftKey ? -1 : 1;
+    focusable[(index + step + focusable.length) % focusable.length].focus();
+  });
+
+  window.__mcpConfirm = confirmDialog;
+
   function matchesSearch(d) {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -1633,10 +1828,13 @@
   }
 
   async function loadMarket({ checkHealth = true, preserveScroll = false } = {}) {
+    const render = beginViewRender();
+    try {
     const previousScrollTop = preserveScroll ? main.scrollTop : 0;
     syncMarketNav();
     main.innerHTML = L('<div class="empty">加载中…</div>');
     const [r, status] = await Promise.all([call('catalog', workspaceParams()), call('status', workspaceParams())]);
+    if (!isViewRenderCurrent(render)) return;
     if (status.ok) {
       updateAvailableWorkspaces(status.detail?.scope?.workspaces);
       setTabCount('installed', (status.detail?.items ?? []).length);
@@ -1658,9 +1856,10 @@
     if (checkHealth && !initialHealthCheckStarted && items.some((item) => item.connected?.length > 0)) {
       initialHealthCheckStarted = true;
       call('healthCheck', {}).then(() => {
-        if (view === 'market') loadMarket({ checkHealth: false });
+        if (view === 'market') loadMarket({ checkHealth: false, preserveScroll: true });
       });
     }
+    } finally { finishViewRender(render); }
   }
 
   function connectionLabels(d) {
@@ -1728,6 +1927,8 @@
   const formatObserved = (value) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '尚无记录';
 
   async function loadToolExplorer() {
+    const render = beginViewRender();
+    try {
     const sequence = ++explorerSequence;
     const workspaceId = currentWorkspace?.workspaceId;
     syncMarketNav();
@@ -1735,7 +1936,7 @@
       main.innerHTML = L(`<section id="tool-explorer"><p class="hint">搜索当前范围内已启用连接的工具缓存；不会执行工具。最近发现成功不代表每次调用均可成功。</p><div class="explorer-filters"><label>连接<select id="explorer-connection" aria-label="按连接筛选"></select></label><label>服务<select id="explorer-server" aria-label="按服务筛选"></select></label><label>发现状态<select id="explorer-status" aria-label="按发现状态筛选"><option value="">全部状态</option>${Object.entries(EXPLORER_STATUS).map(([key, label]) => `<option value="${key}">${label}</option>`).join('')}</select></label><button class="btn ghost" data-explorer-clear>清除筛选</button></div><p id="explorer-summary" role="status">正在读取缓存…</p><div id="explorer-connections"></div><div id="explorer-results"></div><div id="explorer-pages" class="m-actions"></div></section>`);
     }
     const response = await call('toolExplorer', { ...workspaceParams(), ...explorerFilter, query: searchQuery, offset: explorerOffset, limit: 20 });
-    if (sequence !== explorerSequence || view !== 'tools' || workspaceId !== currentWorkspace?.workspaceId) return;
+    if (!isViewRenderCurrent(render) || sequence !== explorerSequence || view !== 'tools' || workspaceId !== currentWorkspace?.workspaceId) return;
     if (!response.ok) { $('#explorer-summary').textContent = L(response.message); return; }
     explorerData = response.detail;
     const { connections = [], selectedConnections = [], items = [], total = 0 } = explorerData;
@@ -1750,8 +1951,10 @@
     $('#explorer-connections').innerHTML = L(`<details ${explorerFilter.connectionKey || !total ? 'open' : ''}><summary>连接状态与故障处理（${selectedConnections.length}）</summary>${selectedConnections.map((c) => `<div class="explorer-card"><strong>${esc(c.connectionName)}</strong><div>${esc(c.serverName)} · ${esc(EXPLORER_STATUS[c.status] || c.status)} · 缓存 ${c.toolCount} 个工具</div><div class="hint">最近发现：${esc(formatObserved(c.checkedAt))}；最后成功：${esc(formatObserved(c.observedAt))}${c.stale ? ' · 缓存超过 24 小时' : ''}${c.cacheTruncated ? ' · 缓存清单已截断' : ''}</div>${c.diagnostic ? `<div>${esc(c.diagnostic.stageLabel)}：${esc(c.diagnostic.message)}<br>建议：${esc(c.diagnostic.action)}</div>` : ''}${c.retryReason === 'auth' ? '<p>鉴权失败已暂停后台重试，请到已安装页更新凭据或重新授权。</p>' : c.nextDiscoveryAt ? `<p class="hint">下次后台发现不早于：${esc(formatObserved(c.nextDiscoveryAt))}（页面保持连接时）</p>` : ''}<div class="m-actions"><button class="btn ghost" data-explorer-action="discover" data-key="${esc(c.connectionKey)}" ${explorerBusy.has(c.connectionKey) ? 'disabled' : ''}>重新发现工具</button><button class="btn ghost" data-explorer-action="check" data-key="${esc(c.connectionKey)}" ${explorerBusy.has(c.connectionKey) ? 'disabled' : ''}>检查连接</button></div></div>`).join('') || '<p>当前筛选下没有连接。</p>'}</details>`);
     $('#explorer-results').innerHTML = L(items.map((item, index) => `<article class="explorer-card"><strong>${esc(item.name)}</strong>${item.title !== item.name ? `<div>${esc(item.title)}</div>` : ''}<p>${esc(item.description || '暂无描述')}</p><div class="hint">来源：${esc(item.connection.connectorName)} / ${esc(item.connection.connectionName)} / ${esc(item.serverName)}<br>${esc(EXPLORER_STATUS[item.connection.status])} · 最后成功缓存 ${esc(formatObserved(item.observedAt))}${item.stale ? ' · 已超过 24 小时' : ''}</div><button class="btn ghost" data-explorer-detail="${index}">参数详情</button></article>`).join('') || `<p class="empty">${connections.length ? '没有匹配工具。请调整关键词或筛选；也可展开连接状态检查是否尚未发现或读取失败。' : '当前范围没有已启用连接。请先添加连接，或选择对应工作区。'}</p>`);
     $('#explorer-pages').innerHTML = L(`<button class="btn ghost" data-explorer-page="prev" ${explorerOffset === 0 ? 'disabled' : ''}>上一页</button><span>${Math.floor(explorerOffset / 20) + 1} / ${Math.max(1, Math.ceil(total / 20))}</span><button class="btn ghost" data-explorer-page="next" ${explorerOffset + 20 >= total ? 'disabled' : ''}>下一页</button>`);
+    } finally { finishViewRender(render); }
   }
 
+  main.addEventListener('scroll', () => saveViewState(), { passive: true });
   main.addEventListener('change', (event) => {
     const fields = { 'explorer-connection': 'connectionKey', 'explorer-server': 'serverName', 'explorer-status': 'status' };
     const field = fields[event.target.id];
@@ -1786,11 +1989,33 @@
     }
   });
 
-  async function loadInstalled() {
+  function emptyMessageHtml(text) { return L(`<div class="empty">${text}</div>`); }
+
+  function migrationBannerHtml(pendingMigration) {
+    return pendingMigration > 0 ? L(`<div class="migration-banner"><div class="copy"><strong>发现旧企查查 MCP 授权</strong>可安全复制 ${pendingMigration} 组授权到 MCP连接器；不会删除旧插件或原凭据。</div><button class="btn" type="button" onclick="window.__mcp.migrateLegacy()">迁移</button></div>`) : '';
+  }
+
+  function installedEmptyHtml(migrationHtml) {
+    return L(`${migrationHtml}<div class="stats"><span class="count">可从旧企查查 OAuth 插件复制已有授权</span><button class="btn ghost" id="config-backup" type="button" onclick="window.__mcp.openConfigBackup()">配置备份</button><button class="btn ghost" type="button" title="扫描企查查旧 OAuth 插件；不会删除旧插件或原凭据" onclick="window.__mcp.scanLegacy()">检测企查查旧授权</button></div><div class="empty">还没有连接任何 MCP · 到「市场」里连接一个吧</div>`);
+  }
+
+  function installedStatsHtml({ migrationHtml, filtered, searchQuery, scopeRevision, rollbackDisabled, rowsHtml, ctaHtml }) {
+    return L(`${migrationHtml}<div class="stats"><span class="count">共 <strong>${filtered.length}</strong> 条连接${searchQuery ? ` · 搜索「${esc(searchQuery)}」` : ''} · 作用域 revision=${scopeRevision}</span><button class="btn ghost" id="scope-rollback" type="button" ${rollbackDisabled} onclick="window.__mcp.rollbackScope()">回滚上次范围变更</button><button class="btn ghost" id="config-backup" type="button" onclick="window.__mcp.openConfigBackup()">配置备份</button><button class="btn ghost" type="button" title="扫描企查查旧 OAuth 插件；不会删除旧插件或原凭据" onclick="window.__mcp.scanLegacy()">检测企查查旧授权</button></div><div class="rows">${rowsHtml}</div>${ctaHtml}`);
+  }
+
+  async function loadInstalled({ preserveScroll = false } = {}) {
+    const render = beginViewRender();
+    try {
+    const previousScrollTop = preserveScroll ? main.scrollTop : 0;
     syncMarketNav();
-    main.innerHTML = L('<div class="empty">加载中…</div>');
+    main.innerHTML = emptyMessageHtml('加载中…');
     const [r, migration] = await Promise.all([call('status', workspaceParams()), call('migrationPreview', { scanStored: false })]);
-    if (!r.ok) { main.innerHTML = L(`<div class="empty">${esc(r.message)}</div>`); return; }
+    if (!isViewRenderCurrent(render)) return;
+    if (!r.ok) {
+      main.innerHTML = `<div class="empty">${esc(r.message)}</div>`;
+      if (preserveScroll) main.scrollTop = previousScrollTop;
+      return;
+    }
     updateAvailableWorkspaces(r.detail?.scope?.workspaces);
     const items = r.detail?.items ?? [];
     installedItems = items;
@@ -1798,13 +2023,20 @@
     scopeRollbackRevision = r.detail?.scope?.history?.at(-1)?.revision ?? null;
     setTabCount('installed', items.length);
     const pendingMigration = migration.ok ? migration.detail?.pendingCount || 0 : 0;
-    const migrationHtml = pendingMigration > 0 ? `<div class="migration-banner"><div class="copy"><strong>发现旧企查查 MCP 授权</strong>可安全复制 ${pendingMigration} 组授权到 MCP连接器；不会删除旧插件或原凭据。</div><button class="btn" type="button" onclick="window.__mcp.migrateLegacy()">迁移</button></div>` : '';
-    if (!items.length) { main.innerHTML = L(`${migrationHtml}<div class="stats"><span class="count">可从旧企查查 OAuth 插件复制已有授权</span><button class="btn ghost" id="config-backup" type="button" onclick="window.__mcp.openConfigBackup()">配置备份</button><button class="btn ghost" type="button" onclick="window.__mcp.scanLegacy()">检测旧插件</button></div><div class="empty">还没有连接任何 MCP · 到「市场」里连接一个吧</div>`); return; }
+    const migrationHtml = migrationBannerHtml(pendingMigration);
+    if (!items.length) {
+      main.innerHTML = installedEmptyHtml(migrationHtml);
+      if (preserveScroll) main.scrollTop = previousScrollTop;
+      return;
+    }
     markCommunityCtaEligible();
     const filtered = items.filter(matchesSearch);
     const rollbackDisabled = scopeRollbackRevision === null ? 'disabled' : '';
-    main.innerHTML = L(`${migrationHtml}<div class="stats"><span class="count">共 <strong>${filtered.length}</strong> 条连接${searchQuery ? ` · 搜索「${esc(searchQuery)}」` : ''} · 作用域 revision=${scopeRevision}</span><button class="btn ghost" id="scope-rollback" type="button" ${rollbackDisabled} onclick="window.__mcp.rollbackScope()">回滚上次范围变更</button><button class="btn ghost" id="config-backup" type="button" onclick="window.__mcp.openConfigBackup()">配置备份</button><button class="btn ghost" type="button" onclick="window.__mcp.scanLegacy()">检测旧插件</button></div><div class="rows">${filtered.map(rowHtml).join('')}</div>${communityCtaHtml()}`);
+    main.innerHTML = installedStatsHtml({ migrationHtml, filtered, searchQuery, scopeRevision, rollbackDisabled, rowsHtml: filtered.map(rowHtml).join(''), ctaHtml: communityCtaHtml() });
+    if (preserveScroll) main.scrollTop = previousScrollTop;
+    } finally { finishViewRender(render); }
   }
+
 
   function rowHtml(r) {
     const key = esc(r.key);
@@ -1821,7 +2053,7 @@
     const diagnostic = r.diagnostic
       ? `<div class="rdiag">${esc(r.diagnostic.stageLabel || r.diagnostic.stage)} · ${esc(r.diagnostic.code)}：${esc(r.diagnostic.message)}；建议：${esc(r.diagnostic.action)}${r.lastSuccessfulAt ? `；最近成功：${esc(new Date(r.lastSuccessfulAt).toLocaleString('zh-CN', { hour12: false }))}` : ''}</div>`
       : '';
-    return `<div class="row" data-key="${key}">
+    return L(`<div class="row" data-key="${key}">
       <div class="info">
         <div class="rname">${esc(r.name)} ${authMode} ${healthBadge} ${scopeBadge} ${insecureNetworkBadge}</div>
         <div class="rmeta">${esc(r.serverName || '')} · ${esc(r.endpoint || r.url || '')}</div>
@@ -1838,9 +2070,10 @@
       ${canEditConfiguration ? `<button class="btn ghost" type="button" onclick="window.__mcp.openEditor('${key}')">编辑配置</button>` : ''}
       ${canRename ? `<button class="btn ghost" type="button" onclick="window.__mcp.openRename('${key}')">重命名</button>` : ''}
       ${enabled ? `<button class="btn ghost" type="button" onclick="window.__mcp.showConnectionTools('${key}')">工具</button>` : ''}
+      ${enabled && r.connectionState !== 'healthy' ? `<button class="btn ghost" type="button" title="重新建立 Host 侧条目并复检：不改配置、凭据、范围或注入模式" onclick="window.__mcp.reconnect('${key}')">重新连接</button>` : ''}
       <button class="btn ghost" type="button" onclick="window.__mcp.openScope('${key}')">范围</button>
       <button class="btn danger" onclick="window.__mcp.disconnect('${key}')">断开</button>
-    </div>`;
+    </div>`);
   }
 
   function guidanceFor(message) {
@@ -2172,7 +2405,11 @@
         const toolText = server.tools?.length ? server.tools.join('、') : '工具清单尚未观察';
         return `${server.serverName}：${toolText}`;
       }).join('\n');
-      if (!confirm(L(`${preview.message}\n${affected}\n\n确认${mode === 'copy' ? '复制到' : '移动到'}所选范围？`))) return;
+      if (!await confirmDialog({
+        title: L('变更连接范围'),
+        message: L(`${preview.message}\n${affected}\n\n确认${mode === 'copy' ? '复制到' : '移动到'}所选范围？`),
+        confirmLabel: L('应用'),
+      })) return;
       setModalBusy(true, '正在应用范围…');
       const result = await call('applyConnectionScope', {
         key: pendingScopeKey,
@@ -2197,7 +2434,11 @@
         const toolText = server.tools?.length ? server.tools.join('、') : '工具清单尚未观察';
         return `${server.serverName}：${toolText}`;
       }).join('\n');
-      if (!confirm(L(`${preview.message}\n${affected}\n\n确认将全部连接范围恢复到 revision=${scopeRollbackRevision}？`))) return;
+      if (!await confirmDialog({
+        title: L('回滚连接范围'),
+        message: L(`${preview.message}\n${affected}\n\n确认将全部连接范围恢复到 revision=${scopeRollbackRevision}？`),
+        confirmLabel: L('回滚'),
+      })) return;
       const result = await call('rollbackConnectionScope', {
         rollbackRevision: scopeRollbackRevision,
         expectedRevision: preview.detail.baseRevision,
@@ -2209,9 +2450,19 @@
     toggle(key, enabled) {
       call('setEnabled', { key, enabled }).then((r) => showToast(r.message, r.ok));
     },
+    async reconnect(key) {
+      const r = await call('reconnect', { key }, { timeoutMs: 30_000 });
+      showToast(r.message, r.ok);
+      if (r.detail?.connectorId) await refreshConnectionUi(r.detail.connectorId);
+      else await refresh();
+    },
     async changeInjectionMode(key, mode, select) {
       const previous = mode === 'session' ? 'always' : 'session';
-      if (mode === 'session' && !confirm(L('按会话启用不会断开 MCP 连接，但会在所有会话中默认隐藏该连接的业务工具。\n\n之后需要在对话中明确选择工具才会临时激活，最长 30 分钟。确认继续？'))) {
+      if (mode === 'session' && !await confirmDialog({
+        title: L('按会话启用'),
+        message: L('按会话启用不会断开 MCP 连接，但会在所有会话中默认隐藏该连接的业务工具。\n\n之后需要在对话中明确选择工具才会临时激活，最长 30 分钟。确认继续？'),
+        confirmLabel: L('启用'),
+      })) {
         select.value = previous;
         return;
       }
@@ -2223,7 +2474,11 @@
       if (result.ok) await refresh();
     },
     async disconnect(key) {
-      if (!confirm(L('确认断开该连接？OAuth 授权会被撤销。'))) return;
+      if (!await confirmDialog({
+        title: L('断开连接'),
+        message: L('确认断开该连接？OAuth 授权会被撤销。'),
+        confirmLabel: L('断开'),
+      })) return;
       const r = await call('disconnect', { key });
       showToast(r.message, r.ok);
       await refresh();
@@ -2252,7 +2507,11 @@
       const preview = await call('previewSnapshot', { snapshotId });
       if (!preview.ok) { showToast(preview.message, false); return; }
       if (!preview.detail?.restorable) { showToast(preview.message, false); return; }
-      if (!confirm(L(`${preview.message}。确认恢复？恢复过程中任一 Server 失败会整体回滚。`))) return;
+      if (!await confirmDialog({
+        title: L('恢复配置快照'),
+        message: L(`${preview.message}。确认恢复？恢复过程中任一 Server 失败会整体回滚。`),
+        confirmLabel: L('恢复'),
+      })) return;
       setModalBusy(true, '正在原子恢复…');
       const result = await call('restoreSnapshot', { snapshotId });
       setModalBusy(false);
@@ -2379,7 +2638,11 @@
       closeModal(); showToast(r.message, true); await refresh();
     },
     async migrateLegacy() {
-      if (!confirm(L('确认把旧企查查 OAuth 授权复制到 MCP连接器？原插件与原凭据会保留；验证新连接后再手动停用旧插件。'))) return;
+      if (!await confirmDialog({
+        title: L('迁移旧授权'),
+        message: L('确认把旧企查查 OAuth 授权复制到 MCP连接器？原插件与原凭据会保留；验证新连接后再手动停用旧插件。'),
+        confirmLabel: L('迁移'),
+      })) return;
       const r = await call('migrateLegacy', { candidateIds: [] });
       showToast(r.message, r.ok);
       await loadInstalled();
@@ -2391,7 +2654,11 @@
         return;
       }
       const ids = (preview.detail.items || []).filter((item) => item.migratable && !item.alreadyMigrated).map((item) => item.id);
-      if (!confirm(L(`检测到 ${ids.length} 组可迁移授权。确认复制到 MCP连接器？原插件与原凭据会保留。`))) return;
+      if (!await confirmDialog({
+        title: L('迁移旧授权'),
+        message: L(`检测到 ${ids.length} 组可迁移授权。确认复制到 MCP连接器？原插件与原凭据会保留。`),
+        confirmLabel: L('迁移'),
+      })) return;
       const result = await call('migrateLegacy', { candidateIds: ids });
       showToast(result.message, result.ok);
       await loadInstalled();
@@ -2412,6 +2679,7 @@
       const incomplete = d.connected?.length > 0 && d.connectionComplete === false;
       detailFailureState = incomplete ? 'incomplete' : (d.connectionState || '');
       detailNeedsReconfigure = incomplete || ['reauth', 'recovering', 'unavailable'].includes(detailFailureState);
+      detailReconnectKey = !incomplete && detailFailureState === 'unknown' && d.connected?.length > 0 ? d.connected[0] : '';
       const loadId = ++detailLoadId;
       $('#detail-icon').innerHTML = isImageIcon(d.icon)
         ? `<img src="${esc(d.icon)}" alt="" onerror="this.parentElement.innerHTML='🔌';" />`
@@ -2439,9 +2707,9 @@
       if (d.connectionKey) $('#detail-disconnect-btn').style.display = 'none';
       $('#detail-try-btn').style.display = d.connectionKey ? 'none' : '';
       const needsCredential = ['bearer', 'api-key'].includes(d.authMode);
-      $('#detail-try-btn').textContent = detailNeedsReconfigure
+      $('#detail-try-btn').textContent = detailTryLabel(detailNeedsReconfigure
         ? detailFailureState === 'incomplete' ? (d.authMode === 'oauth2-pkce' ? t('upgradeOauth') : t('completeSetup')) : d.authMode === 'oauth2-pkce' && detailFailureState === 'reauth' ? L('🔐 重新授权') : needsCredential && detailFailureState === 'reauth' ? t('reconfigureCredential') : L('🔄 重新检查')
-        : d.connected?.length > 0 ? t('try') : needsCredential ? t('configureConnect') : t('connectTry');
+        : d.connected?.length > 0 ? t('try') : needsCredential ? t('configureConnect') : t('connectTry'));
       if (!d.connected?.length && !d.toolsSnapshot?.length) {
         $('#tools-summary').textContent = L('连接后查看工具');
         $('#detail-tools').innerHTML = L('<div class="tools-empty">连接后可读取服务端工具清单</div>');
@@ -2461,6 +2729,7 @@
       if (!toolsResult.ok) {
         detailFailureState = toolsResult.detail?.connectionState || detailFailureState || 'unavailable';
         detailNeedsReconfigure = true;
+        detailReconnectKey = detailFailureState === 'unknown' && d.connected?.length > 0 ? d.connected[0] : '';
         const diagnostic = toolsResult.detail?.diagnostic;
         $('#tools-summary').textContent = L(detailFailureState === 'unknown' ? '工具状态未知' : '工具加载失败');
         const failureHtml = L(`<div class="tools-error">${esc(toolsResult.message)}${diagnostic ? `<br><br>${esc(diagnostic.stageLabel || diagnostic.stage)} · ${esc(diagnostic.code)}：${esc(diagnostic.message)}<br>建议：${esc(diagnostic.action)}${diagnostic.lastSuccessfulAt ? `<br>最近成功：${esc(new Date(diagnostic.lastSuccessfulAt).toLocaleString('zh-CN', { hour12: false }))}` : ''}` : ''}</div>`);
@@ -2475,19 +2744,20 @@
           ? (d.authMode === 'oauth2-pkce' ? '授权已失效' : '凭据已失效')
           : detailFailureState === 'unknown' ? '状态尚未确认' : '当前连接异常';
         $('#detail-vendor').textContent = L(d.vendor ? `${d.vendor} · ${failureLabel}` : failureLabel);
-        $('#detail-try-btn').textContent = d.authMode === 'oauth2-pkce' && detailFailureState === 'reauth'
+        $('#detail-try-btn').textContent = detailTryLabel(d.authMode === 'oauth2-pkce' && detailFailureState === 'reauth'
           ? L('🔐 重新授权')
-          : needsCredential && detailFailureState === 'reauth' ? t('reconfigureCredential') : L('🔄 重新检查');
+          : needsCredential && detailFailureState === 'reauth' ? t('reconfigureCredential') : L('🔄 重新检查'));
         renderPromptPage();
         return;
       }
       detailFailureState = incomplete ? 'incomplete' : (toolsResult.detail?.connectionState || 'healthy');
       detailNeedsReconfigure = incomplete;
+      detailReconnectKey = detailFailureState === 'unknown' && d.connected?.length > 0 ? d.connected[0] : '';
       const connectedLabel = incomplete
         ? `待补充 ${d.missingServers?.length || 1} 个服务`
         : `${detailFailureState === 'degraded' ? '部分服务可用' : '已连接'} ${d.connected?.length || 0} 个服务`;
       $('#detail-vendor').textContent = L(d.vendor ? `${d.vendor} · ${connectedLabel}` : connectedLabel);
-      $('#detail-try-btn').textContent = incomplete ? (d.authMode === 'oauth2-pkce' ? t('upgradeOauth') : t('completeSetup')) : t('try');
+      $('#detail-try-btn').textContent = detailTryLabel(incomplete ? (d.authMode === 'oauth2-pkce' ? t('upgradeOauth') : t('completeSetup')) : t('try'));
       renderPromptPage();
       detailToolServers = toolsResult.detail?.servers || [];
       updateToolsSummary();
@@ -2530,7 +2800,11 @@
     },
     async disconnectCurrent() {
       const name = detailConnector?.name || $('#detail-name').textContent;
-      if (!confirm(L(`确认断开「${name}」的连接？OAuth 授权会被撤销。`))) return;
+      if (!await confirmDialog({
+        title: L('断开连接'),
+        message: L(`确认断开「${name}」的连接？OAuth 授权会被撤销。`),
+        confirmLabel: L('断开'),
+      })) return;
       // Find connection keys for this connector
       const r = await call('status', workspaceParams());
       if (r.ok) {
@@ -2580,6 +2854,12 @@
     }
   });
   $('#detail-try-btn').addEventListener('click', async () => {
+    if (detailReconnectKey) {
+      const key = detailReconnectKey;
+      detailReconnectKey = '';
+      await window.__mcp.reconnect(key);
+      return;
+    }
     if (detailNeedsReconfigure) {
       if (detailFailureState === 'incomplete' && ['bearer', 'api-key'].includes(detailConnector?.authMode)) {
         openAddConnection('manual', detailConnector);
@@ -2676,8 +2956,9 @@
         : available > 0 ? '部分服务可用' : '当前连接异常';
       detailFailureState = pending ? 'unknown' : available > 0 ? 'healthy' : 'unavailable';
       detailNeedsReconfigure = !pending && available === 0;
+      detailReconnectKey = '';
       $('#detail-vendor').textContent = L(detailConnector.vendor ? `${detailConnector.vendor} · ${label}` : label);
-      $('#detail-try-btn').textContent = detailNeedsReconfigure ? L('🔄 重新检查') : t('try');
+      $('#detail-try-btn').textContent = detailTryLabel(detailNeedsReconfigure ? L('🔄 重新检查') : t('try'));
     }
   }
 
@@ -2692,7 +2973,7 @@
       try {
         if (view === 'tools') await loadToolExplorer();
         else if (view === 'market') await loadMarket({ checkHealth: false, preserveScroll: true });
-        else await loadInstalled();
+        else await loadInstalled({ preserveScroll: true });
         await refreshOpenToolDetail();
       } finally {
         statusRefreshRunning = false;
@@ -2724,6 +3005,7 @@
     }
   });
   window.addEventListener('pagehide', () => {
+    saveViewState();
     notifyDetailState(false);
     clearTimeout(statusRefreshTimer);
     statusEventSource?.close();
@@ -2744,6 +3026,7 @@
     const categoryFilter = event.target.closest('[data-category-filter]');
     if (categoryFilter) {
       marketCategory = categoryFilter.dataset.categoryFilter || '';
+      pendingViewScroll = null; main.scrollTop = 0;
       loadMarket({ checkHealth: false });
     }
   });
@@ -2771,6 +3054,7 @@
     const btn = e.target.closest('button[data-view]');
     if (!btn) return;
     view = btn.dataset.view;
+    pendingViewScroll = null; main.scrollTop = 0;
     explorerSequence++; explorerDetailSequence++;
     syncTabs();
     refresh();
@@ -2778,6 +3062,7 @@
 
   searchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value.trim();
+    pendingViewScroll = null; main.scrollTop = 0;
     explorerSequence++; explorerOffset = 0;
     clearTimeout(searchTimer);
     if (view === 'tools') { searchTimer = setTimeout(() => { if (view === 'tools') void loadToolExplorer(); }, 200); return; }
@@ -2788,6 +3073,7 @@
   $('#lang-select').addEventListener('change', (event) => setLang(event.target.value));
 
   applyStaticI18n();
+  if (viewStateReady) restoreViewState();
   requestWorkspaceContext();
   connectStatusEvents();
   refresh();

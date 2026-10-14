@@ -99,7 +99,9 @@ for (const [mode, method] of [['hang-discover', 'server/discover'], ['hang-init'
 }
 
 test('transparent mode forwards discovery and unknown extension messages', { timeout: 7000 }, async () => {
-  const c = launch();
+  // This is a forwarding test, not a 250ms startup benchmark. Concurrent CI
+  // workers may need longer to spawn Node; deadline enforcement is tested above.
+  const c = launch('normal', { timeout: 3000 });
   try {
     c.send('server/discover', 'probe');
     assert.equal((await within(c.reply())).error.code, -32601);
@@ -129,11 +131,25 @@ test('initial tool discovery completes and later tool lists retain the Host dead
 });
 
 test('startup discovery guard remains active across pagination', { timeout: 7000 }, async () => {
-  const c = launch('hang-page');
+  const c = launch('hang-page', { timeout: 1500 });
   try {
     c.send('tools/list'); assert.equal((await within(c.reply())).result.nextCursor, 'page-2');
     c.send('tools/list', 2, { cursor: 'page-2' });
     assert.equal((await within(c.exit)).code, 1);
+  } finally { await c.cleanup(); }
+});
+
+test('guard-only ELECTRON_RUN_AS_NODE never reaches the real server', { timeout: 7000 }, async () => {
+  const probe = "process.stdout.write(JSON.stringify({ asNode: process.env.ELECTRON_RUN_AS_NODE ?? null }) + String.fromCharCode(10));";
+  const c = launch('normal', {
+    command: process.execPath,
+    commandArgs: ['-e', probe],
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    timeout: 2000,
+  });
+  try {
+    c.send('initialize');
+    assert.equal((await within(c.reply())).asNode, null);
   } finally { await c.cleanup(); }
 });
 

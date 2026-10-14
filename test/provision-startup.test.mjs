@@ -49,3 +49,24 @@ test('guarded OAuth stdio tokens remain runtime-only and request budgets fail cl
   assert.equal(oauth.env.MCP_TOKEN, undefined);
   for (const timeout of [0, 99, Infinity, 2_147_483_648]) assert.throws(() => buildEntryConfig(record, new Map(), { startupRequestTimeoutMs: timeout }), RangeError);
 });
+
+test('desktop hosts start the guard as Node without leaking the switch to the server', () => {
+  const original = structuredClone(record);
+  process.versions.electron = '44.0.0';
+  try {
+    const guarded = buildEntryConfig(record, new Map(), { startupRequestTimeoutMs: 800 });
+    assert.equal(guarded.command, process.execPath);
+    assert.equal(guarded.env.ELECTRON_RUN_AS_NODE, '1');
+    assert.equal(guarded.env.TEST_TOKEN, 'synthetic-token');
+    assert.notEqual(guarded.env, record.env);
+    // 未加 guard 的路径不需要该变量，避免把它交给用户配置的 server
+    assert.equal(buildEntryConfig(record, new Map(), {}).env.ELECTRON_RUN_AS_NODE, undefined);
+    assert.deepEqual(record, original);
+  } finally {
+    delete process.versions.electron;
+  }
+  // CLI 宿主（node 进程）行为不变
+  const cli = buildEntryConfig(record, new Map(), { startupRequestTimeoutMs: 800 });
+  assert.equal(cli.env.ELECTRON_RUN_AS_NODE, undefined);
+  assert.deepEqual(cli.env, record.env);
+});

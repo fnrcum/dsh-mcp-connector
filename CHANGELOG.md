@@ -2,7 +2,38 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；首个公开版本从 `0.1.0` 开始。
 
-## [Unreleased]
+## [0.2.72] - 2026-10-14
+
+### Fixed
+
+- 宿主切换面板销毁 iframe 后，按工作区恢复页签、搜索、市场分类、展开章节、工具筛选/分页及列表滚动。状态仅保留在同源宿主当前页面内存，最多 32 个工作区，不保存凭据表单、API 返回或授权弹框；刷新宿主页面即清除。
+- 市场与已安装列表加入请求序列和工作区检查，防止较早响应覆盖新页签/工作区；加载中的滚动归零不覆盖恢复位置。
+- 本次为浏览状态恢复而非 iframe 保活：仍重新拉取数据、重建 SSE，详情和未完成表单不恢复。
+
+## [0.2.71] - 2026-10-14
+
+### Added
+
+- 目录新增 HTTP Server 的 `servers[].oauthResource`：MCP URL 需要携带查询参数（如 `?tools=`）时，OAuth 的 `resource` 授权参数、`grant.authorizedResources` 与刷新参数改用规范资源标识，实际请求仍使用带查询参数的 `url`，避免刷新被授权服务器按 `invalid_target` 拒绝。仅 `oauth2-pkce` 卡片可声明，且必须与 `url` 同源。
+- Registry 种子新增“Exa·网络搜索”第三方卡片（`registry/connectors/exa-search.json`）：OAuth 一键授权接入 Exa 官方远程 MCP，覆盖语义搜索、全文抓取、高级检索与多步研究 Agent。
+
+### Fixed
+
+- 修复 Windows 钉钉 CLI 包 bin 字段带 ./ 前缀时无法发现原生程序；精确匹配的旧受管桥接命令在运行时更新到 0.2.71，不覆盖自定义参数。
+- 原生确认框改为页面内对话框，取消默认聚焦且 Enter 尊重焦点，避免误确认和桌面失焦。
+- 已安装列表状态刷新保留滚动位置，回归测试抽取失败时显式报错。
+- 远程目录请求支持 HTTP_PROXY / HTTPS_PROXY / NO_PROXY，不修改宿主全局代理。
+- 桌面嵌入 CSP 允许显式配置可信祖先源，默认仍为 self。
+- 重连与同一连接的停用、删除、修改串行执行；多 Server 注册等待并行，失败明确区分保留配置与 Host 状态。
+
+- `normalizeConnectorDescriptor` 不再静默丢弃 HTTP Server 上的 `oauthResource` / `oauthTokenEnv`：前者现在生效，后者由目录审计显式拒绝，描述文件作者不会在无任何报错的情况下被忽略。
+- 「已安装」页为未处于“已连接”的连接提供「重新连接」：重建 Host 侧条目并在有界时间内等待 stdio 工具重新注册，不修改配置、凭据、范围或注入模式；对话工具同步新增 `mcp_connector_reconnect`。
+
+### Changed
+
+- 「检测旧插件」改名为「检测企查查旧授权」，并说明扫描范围与“不会删除旧插件或原凭据”。
+
+- 桌面宿主（Electron 内嵌 DSH）下启动 stdio 连接不再必然失败：以 `process.execPath` 启动守卫时注入 `ELECTRON_RUN_AS_NODE`，守卫再把该变量从真实 server 的子进程环境中移除（0.2.70 的 #130 只覆盖了 CLI 宿主）。
 
 ## [0.2.70] - 2026-10-08
 
