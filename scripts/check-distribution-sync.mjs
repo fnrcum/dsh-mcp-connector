@@ -37,7 +37,6 @@ export const DEFAULT_TARGETS = [
     label: 'dshbase',
     url: 'https://www.dshbase.com/plugins/dsh-mcp-connector/',
     parser: 'dshbase',
-    trackingUrl: 'https://github.com/ylwl1997/dshbase/issues/100',
   },
 ];
 
@@ -200,7 +199,9 @@ export async function checkDistributionSync({ fetchImpl = fetch, targets = DEFAU
     }
   }));
 
-  const blockingStatuses = new Set(['stale', 'invalid', 'missing']);
+  // A failed probe is unknown, not proof of synchronization. Strict checks
+  // must not pass when one (or every) directory is unreachable.
+  const blockingStatuses = new Set(['stale', 'invalid', 'missing', 'unavailable']);
   return {
     package: PACKAGE_NAME,
     canonicalVersion,

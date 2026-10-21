@@ -1,6 +1,28 @@
 # DSH MCP Connector Distribution Ledger
 
-Last updated: 2026-10-02 (Asia/Shanghai)
+Last updated: 2026-10-15 (Asia/Shanghai)
+
+## Current closeout — 2026-10-15
+
+This section supersedes the dated historical observations below.
+
+- npm latest is 0.2.73. [PR #153](https://github.com/duhu2000/dsh-mcp-connector/pull/153)
+  merged as f27354d; six CI checks passed. Strict monitoring now fails on
+  unreachable directories rather than treating unknown availability as success.
+- [Run 38745991390](https://github.com/duhu2000/dsh-mcp-connector/actions/runs/38745991390)
+  updated #69 successfully: awesome and DSH Directory 0.2.72, dshfind 0.2.70;
+  dsh.pub 0.2.72 without the npm link. These remain independent observations.
+- dshbase #100 is CLOSED, with maintainer confirmation on Oct 9. Local HTTP
+  checking sees version 0.2.70 and the canonical npm link, while GitHub CI gets
+  HTTP 403. The npm defect is resolved; version freshness and CI accessibility
+  are not. Do not reopen #100 or duplicate the closed, unmerged PR #110.
+- dsh.pub #117 remains open without feedback. #132 still lacks Windows Desktop
+  installation stderr/hub.log; six passing CI checks do not resolve it.
+- dshmk #7 and Extension Hub #12 remain open, last updated Aug 31. They are
+  external evidence blockers, not completed runtime validations.
+- Core six-query search revalidation passed in local Market 1.58.0;
+  [growth review](GROWTH-BASELINE.md) records the exact conditions and limits.
+- This monitor/documentation closeout requires no npm release or new Tag.
 
 This document is the source of truth for external distribution of
 [`duhu2000/dsh-mcp-connector`](https://github.com/duhu2000/dsh-mcp-connector).
@@ -15,7 +37,7 @@ the same upstream data source.
 | Product | MCP Connector / MCP连接器 |
 | Repository | [`duhu2000/dsh-mcp-connector`](https://github.com/duhu2000/dsh-mcp-connector) |
 | npm package | [`dsh-mcp-connector`](https://www.npmjs.com/package/dsh-mcp-connector) |
-| Current release | `0.2.64` (npm `latest`, checked 2026-10-02) |
+| Current release | `0.2.73` (npm `latest`, checked 2026-10-15) |
 | License | MIT |
 | GitHub discovery topic | `dsh-plugin` |
 | Plugin type | DSH client plugin, MCP connection manager, and connector marketplace |
@@ -142,7 +164,7 @@ the destination schema without changing the product identity.
 
 - Repository: `https://github.com/duhu2000/dsh-mcp-connector`
 - npm: `https://www.npmjs.com/package/dsh-mcp-connector`
-- Release: `0.2.64`
+- Release: use [latest release](https://github.com/duhu2000/dsh-mcp-connector/releases/latest); verified `0.2.73` on 2026-10-15
 - License: MIT
 - Category preference: `Integrations & Connectors`; otherwise
   `Plugins & Runtime`, `Integration`, or `Plugin Markets & Managers`
@@ -178,7 +200,8 @@ canonical npm release with the monitored public directories. The daily
 `External directory sync` workflow keeps one deduplicated repository Issue open
 while required metadata is stale or invalid, and closes it automatically after
 the public pages converge. Temporary network outages are reported as
-`unavailable` but do not create false drift failures.
+`unavailable` and fail strict verification: this means unverified accessibility,
+not proven metadata corruption. They do not permit automatic issue closure.
 
 ## Out-of-scope directories
 

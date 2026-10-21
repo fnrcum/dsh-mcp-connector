@@ -105,3 +105,11 @@ gh api 'repos/duhu2000/dsh-mcp-connector-registry/contents/catalog-stats.json?re
 - [ ] 在专用空白 Notion 测试工作区完成 OAuth、`tools/list` 与只读搜索演示，避免把官方文档能力误写成当前客户端已验收事实。
 - [ ] 为三个场景分别准备一张脱敏结果截图或短 GIF；截图中不得出现真实工作区名称、账号、Token、客户数据或个人信息。
 - [ ] 发布前再次读取 `catalog-stats.json`；若数字变化，同步更新精确版，耐久短描述可继续使用“超百个”。
+
+## 7. 后续增量复核
+
+本目录的 v0.2.45 数字仍是历史基线，不随当前市场数量自动改写。后续数据源评估使用：
+
+- [数据源 MCP 候选证据模板](DATA-SOURCE-REVIEW-TEMPLATE.md)
+- [2026-10-16 P3 数据源复核](reviews/2026-10-16-p3.md)
+- [2026-10-16 机器可读证据](reviews/2026-10-16-p3.json)

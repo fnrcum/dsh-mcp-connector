@@ -14,7 +14,9 @@ const PATHS = {
   tools: 'docs/tutorials/TOOL-SEARCH-RECOVERY.md',
   scenarios: 'docs/tutorials/FIRST-SUCCESS-SCENARIOS.md',
   statusCopy: 'docs/tutorials/TRUSTED-STATUS-COPY.md',
+  contribution: 'docs/FIRST-CONTRIBUTION.md',
   publicationDrafts: 'marketing/campaign-0.2.59/P1-SCENARIO-PUBLICATION-DRAFTS.md',
+  publicationPack: 'marketing/P1-FIRST-SUCCESS-PUBLICATION-PACK-2026-10-16.md',
 };
 
 function requireText(path, text, expected) {
@@ -59,6 +61,23 @@ export async function checkFirstUseDocs() {
 
   for (const [key, path] of [['json', PATHS.json], ['oauth', PATHS.oauth], ['tools', PATHS.tools]]) {
     requireText(path, docs[key], '(README.md)');
+    for (const expected of [
+      '## 授权前提、费用与数据去向',
+      '## 可复现步骤与成功判据',
+      '无数据/待验收',
+    ]) {
+      requireText(path, docs[key], expected);
+    }
+  }
+
+  for (const expected of [
+    '## 开始前先填一张验收卡',
+    '授权前提',
+    '费用',
+    '数据去向',
+    '通过证据',
+  ]) {
+    requireText(PATHS.entry, docs.entry, expected);
   }
 
   for (const expected of [
@@ -99,8 +118,36 @@ export async function checkFirstUseDocs() {
     '2026-10-02',
     '2026-10-09',
     '不从下载量推算连接或首次调用',
+    '(../P1-FIRST-SUCCESS-PUBLICATION-PACK-2026-10-16.md)',
   ]) {
     requireText(PATHS.publicationDrafts, docs.publicationDrafts, expected);
+  }
+
+  for (const expected of [
+    '仅仓库准备，不得自动发布',
+    '发布所有权与直链登记',
+    '未发布，无直链',
+    'JSON-MIGRATION.md',
+    'OAUTH-DIAGNOSTICS.md',
+    'TOOL-SEARCH-RECOVERY.md',
+    'v0.2.46 无凭据 Mock',
+    '43 秒 `docs/demo.gif`',
+    '1280×720',
+    '800px',
+    '“需重新授权”',
+  ]) {
+    requireText(PATHS.publicationPack, docs.publicationPack, expected);
+  }
+
+  for (const expected of [
+    '#29',
+    '已完成并关闭',
+    'issues/156',
+    '当前可认领的新手任务',
+    'scripts/check-tutorial-links.mjs',
+    '不发起网络请求',
+  ]) {
+    requireText(PATHS.contribution, docs.contribution, expected);
   }
 
   for (const expected of [
@@ -112,6 +159,10 @@ export async function checkFirstUseDocs() {
     'T+7 = 2026-10-02',
     'T+14 = 2026-10-09',
     'Fill only after due date',
+    '## Repeatable equal-window review procedure',
+    '`P-7` through `P-1`',
+    '`P+1` through `P+7`',
+    'Call it an equal-window change, not campaign attribution or a',
   ]) {
     requireText(PATHS.growth, docs.growth, expected);
   }

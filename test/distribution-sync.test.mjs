@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   DEFAULT_TARGETS,
+  checkDistributionSync,
   assessTarget,
   parseAwesome,
   parseDshbasePage,
@@ -12,6 +13,31 @@ import {
 } from '../scripts/check-distribution-sync.mjs';
 
 const target = { id: 'directory', label: 'Directory', url: 'https://example.test/plugin' };
+
+test('unavailable directories cannot pass the strict synchronization gate', async () => {
+  const report = await checkDistributionSync({
+    targets: [{ ...target, parser: 'json-ld' }],
+    fetchImpl: async (url) => url.includes('registry.npmjs.org')
+      ? { ok: true, text: async () => JSON.stringify({ version: '0.2.73' }) }
+      : { ok: false, status: 403 },
+  });
+  assert.equal(report.ok, false);
+  assert.equal(report.converged, false);
+  assert.equal(report.targets[0].status, 'unavailable');
+  assert.equal(report.targets[0].detail, 'HTTP 403');
+});
+
+test('verified current directories pass synchronization', async () => {
+  const report = await checkDistributionSync({
+    targets: [{ ...target, parser: 'awesome' }],
+    fetchImpl: async (url) => ({ ok: true, text: async () => JSON.stringify(
+      url.includes('registry.npmjs.org') ? { version: '0.2.73' }
+        : { plugins: [{ name: 'dsh-mcp-connector', version: '0.2.73', npm: 'dsh-mcp-connector' }] },
+    ) }),
+  });
+  assert.equal(report.ok, true);
+  assert.equal(report.converged, true);
+});
 
 test('runs the external directory check after a successful Release workflow', () => {
   const workflow = readFileSync(new URL('../.github/workflows/distribution-sync.yml', import.meta.url), 'utf8');
@@ -29,7 +55,9 @@ test('links each active external metadata defect to its current follow-up', () =
   const tracking = Object.fromEntries(DEFAULT_TARGETS.map((candidate) => [candidate.id, candidate.trackingUrl]));
   assert.equal(tracking.dshfind, undefined);
   assert.equal(tracking['dsh-pub'], 'https://github.com/dsh-pub/dsh-pub/issues/117');
-  assert.equal(tracking.dshbase, 'https://github.com/ylwl1997/dshbase/issues/100');
+  // #100 was closed by the maintainer after fixing npm metadata; transient
+  // availability/version drift must not point users to a resolved defect.
+  assert.equal(tracking.dshbase, undefined);
 });
 
 test('parses the connector from awesome-dsh-plugin registry JSON', () => {

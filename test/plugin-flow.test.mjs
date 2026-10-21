@@ -103,7 +103,8 @@ function makePluginContext({ shared, loaderHooks, workspaces, withWeb = false } 
   };
   const routes = new Map();
   if (withWeb) ctx.inject = (dependencies, callback) => {
-    if (dependencies.includes('webServer')) callback({
+    if (dependencies.includes('webServer') && dependencies.includes('webRuntime')) callback({
+      effect: ctx.effect,
       webRuntime: {}, webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } },
     });
   };
@@ -142,6 +143,325 @@ async function waitFor(fn, { timeout = 5000, interval = 20 } = {}) {
     await new Promise((r) => setTimeout(r, interval));
   }
 }
+
+test('精简工具配置保持旧默认；开启后仅两个入口且图形 API 仍可用（#161）', async () => {
+  const { apply, Config } = await import('../lib/index.js');
+  assert.equal(Config({}).compactManagementTools, false);
+  assert.equal(Config({ compactManagementTools: true }).compactManagementTools, true);
+  const { ctx, tools, webCall, disposers } = makePluginContext({ withWeb: true });
+  try {
+    await apply(ctx, baseConfig({ compactManagementTools: true }));
+    assert.deepEqual([...tools.defs.keys()], ['mcp_connector_discover', 'mcp_connector_session_tools']);
+    const status = await tools.defs.get('mcp_connector_discover').execute({ action: 'status' });
+    assert.equal(status.ok, true);
+    assert.equal((await webCall('status')).ok, true);
+    const invalid = await webCall('configure', {});
+    assert.equal(invalid.ok, false);
+    assert.match(invalid.message, /name 必填/);
+  } finally {
+    for (const dispose of disposers) await dispose();
+  }
+  assert.equal(tools.defs.size, 0);
+});
+
+test('市场 stdio 本地覆盖：重连、快照恢复、停用保持及失败回滚（#146）', async () => {
+  let failUpdate = false;
+  const loaderHooks = { onUpdate: ({ patch }) => {
+    if (failUpdate && patch.config?.args?.includes('synthetic-secret')) throw new Error('synthetic-secret');
+  } };
+  const { ctx, tools, tables, loader, webCall, disposers } = makePluginContext({ withWeb: true, loaderHooks });
+  const { apply } = await import('../lib/index.js');
+  const descriptor = { id: 'local-overlay', name: 'Overlay', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: 'local-overlay', transport: 'stdio', command: 'node', args: ['server.js'], env: { BASE: 'original' } }] };
+  try {
+    await apply(ctx, baseConfig({ connectors: [descriptor] }));
+    const connected = await webCall('connect', { connectorId: descriptor.id });
+    assert.equal(connected.ok, true, connected.message);
+    const key = 'local-overlay-main';
+    const record = () => tables.get('connections').get(key);
+    const entry = () => loader.entries.get(`mcp-${key}`);
+    const first = await webCall('applyLocalOverrides', { key, json: JSON.stringify({ argsAppend: ['--safe'], env: { TOKEN: 'synthetic-secret' } }) });
+    assert.equal(first.ok, true, first.message);
+    assert.deepEqual(entry().options.config.args, ['server.js', '--safe']);
+    assert.deepEqual((await record()).args, ['server.js']);
+    const safe = await webCall('editableLocalOverrides', { key });
+    assert.doesNotMatch(JSON.stringify(safe), /synthetic-secret/);
+    assert.equal((await webCall('applyLocalOverrides', { key, json: safe.detail.json })).ok, true);
+    tools.register({ name: 'mcp__local-overlay__search', description: 'Synthetic local tool', parameters: {} });
+    assert.equal((await webCall('reconnect', { key })).ok, true);
+    assert.deepEqual(entry().options.config.args, ['server.js', '--safe']);
+    failUpdate = true;
+    const failed = await webCall('applyLocalOverrides', { key, json: JSON.stringify({ argsAppend: ['synthetic-secret'] }) });
+    assert.equal(failed.ok, false);
+    assert.doesNotMatch(JSON.stringify(failed), /synthetic-secret/);
+    assert.deepEqual(entry().options.config.args, ['server.js', '--safe']);
+    assert.deepEqual((await record()).localOverrides.argsAppend, ['--safe']);
+    failUpdate = false;
+    assert.equal((await webCall('setEnabled', { key, enabled: false })).ok, true);
+    assert.equal((await webCall('applyLocalOverrides', { key, json: '{"cwd":"/changed"}' })).ok, true);
+    assert.equal((await record()).enabled, false);
+    assert.equal(entry().disabled, true);
+    assert.equal((await webCall('restoreSnapshot', { snapshotId: first.detail.snapshotId })).ok, true);
+    assert.equal((await record()).localOverrides, undefined);
+    assert.deepEqual(entry().options.config.args, ['server.js']);
+    assert.equal((await webCall('applyLocalOverrides', { key, json: '{"argsAppend":["--again"]}' })).ok, true);
+    assert.equal((await webCall('applyLocalOverrides', { key, reset: true })).ok, true);
+    assert.equal((await record()).localOverrides, undefined);
+    assert.deepEqual(entry().options.config.args, ['server.js']);
+    assert.equal([...tools.defs.keys()].filter((name) => name.startsWith('mcp_connector_')).length, 25, 'no additional resident management tool');
+  } finally { for (const dispose of disposers) await dispose(); }
+});
+
+for (const finalAction of ['disable', 'disconnect', 'edit']) {
+  test(`超时启动迟到完成不能覆盖后续 ${finalAction}（#165）`, { timeout: 10000 }, async () => {
+    // The production timeout is unref'ed; the fake Host has no process/socket
+    // to keep older Node test runners alive while that deadline is pending.
+    const keepAlive = setInterval(() => {}, 1000);
+    let finish;
+    let delayed = false;
+    const pending = new Promise(resolve => { finish = resolve; });
+    const host = makePluginContext({ withWeb: true, loaderHooks: {
+      async onUpdate({ patch }) {
+        if (!delayed && patch.config?.args?.includes('--slow')) {
+          delayed = true;
+          await pending;
+        }
+      },
+    } });
+    const { apply } = await import('../lib/index.js');
+    const id = 'late-overlay';
+    const key = `${id}-main`;
+    const descriptor = { id, name: 'Late overlay', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: id, transport: 'stdio', command: 'node', args: ['server.js'] }] };
+    try {
+      await apply(host.ctx, baseConfig({ connectors: [descriptor], startupTimeoutMs: 1000 }));
+      assert.equal((await host.webCall('connect', { connectorId: id })).ok, true);
+      const failed = await host.webCall('applyLocalOverrides', { key, json: '{"argsAppend":["--slow"]}' });
+      assert.equal(failed.ok, false);
+      const result = finalAction === 'disable'
+        ? await host.webCall('setEnabled', { key, enabled: false })
+        : finalAction === 'disconnect'
+          ? await host.webCall('disconnect', { key })
+          : await host.webCall('applyLocalOverrides', { key, json: '{"argsAppend":["--new"]}' });
+      assert.equal(result.ok, true, result.message);
+      finish();
+      // Drain the resolved startup task and its queued reconciliation.
+      await new Promise(resolve => setTimeout(resolve, 50));
+      const record = await host.tables.get('connections').get(key);
+      const entry = host.loader.entries.get(`mcp-${key}`);
+      if (finalAction === 'disconnect') {
+        assert.equal(record, undefined);
+        assert.equal(entry, undefined);
+      } else if (finalAction === 'disable') {
+        assert.equal(record.enabled, false);
+        assert.equal(entry.disabled, true);
+      } else {
+        assert.deepEqual(record.localOverrides.argsAppend, ['--new']);
+        assert.deepEqual(entry.options.config.args, ['server.js', '--new']);
+      }
+    } finally { clearInterval(keepAlive); finish(); for (const dispose of host.disposers) await dispose(); }
+  });
+}
+
+for (const finalAction of ['disable', 'disconnect']) {
+  test(`首次 stdio 安装与本地覆盖编辑、${finalAction} 按请求顺序串行（#146）`, { timeout: 5000 }, async () => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    let entered;
+    const started = new Promise(resolve => { entered = resolve; });
+    let creates = 0;
+    const host = makePluginContext({ withWeb: true, loaderHooks: { onCreate: async () => {
+      creates++;
+      entered();
+      await gate;
+    } } });
+    const { apply } = await import('../lib/index.js');
+    const descriptor = { id: 'queued-overlay', name: 'Queued overlay', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: 'queued-overlay', transport: 'stdio', command: 'node', args: ['server.js'] }] };
+    const key = 'queued-overlay-main';
+    try {
+      await apply(host.ctx, baseConfig({ connectors: [descriptor] }));
+      const first = host.webCall('connect', { connectorId: descriptor.id, localOverrides: '{"argsAppend":["--first"]}' });
+      await started;
+      const second = host.webCall('connect', { connectorId: descriptor.id, localOverrides: '{"argsAppend":["--second"]}' });
+      const edit = host.webCall('applyLocalOverrides', { key, json: '{"argsAppend":["--edited"]}' });
+      const last = finalAction === 'disable'
+        ? host.webCall('setEnabled', { key, enabled: false })
+        : host.webCall('disconnect', { key });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(creates, 1, 'overlapping install must not start a second Host entry');
+      release();
+      for (const result of await Promise.all([first, second, edit, last])) assert.equal(result.ok, true, result.message);
+      const record = await host.tables.get('connections').get(key);
+      const entry = host.loader.entries.get(`mcp-${key}`);
+      if (finalAction === 'disable') {
+        assert.equal(record.enabled, false);
+        assert.equal(entry.disabled, true);
+        assert.deepEqual(record.localOverrides.argsAppend, ['--edited']);
+        assert.deepEqual(entry.options.config.args, ['server.js', '--edited']);
+      } else {
+        assert.equal(record, undefined);
+        assert.equal(entry, undefined);
+      }
+    } finally {
+      release();
+      for (const dispose of host.disposers) await dispose();
+    }
+  });
+}
+
+test('本地参数存储失败恢复旧记录和 Host，首次安装失败不残留（#146）', async () => {
+  const host = makePluginContext({ withWeb: true });
+  const { apply } = await import('../lib/index.js');
+  const descriptor = { id: 'storage-overlay', name: 'Storage overlay', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: 'storage-overlay', transport: 'stdio', command: 'node', args: ['server.js'] }] };
+  const table = host.tables.get('connections');
+  const put = table.put.bind(table);
+  table.put = async (key, record) => {
+    if (record.localOverrides?.env?.FAIL === 'private-storage-value') throw new Error('private-storage-value');
+    return put(key, record);
+  };
+  const json = '{"env":{"FAIL":"private-storage-value"}}';
+  try {
+    await apply(host.ctx, baseConfig({ connectors: [descriptor] }));
+    const first = await host.webCall('connect', { connectorId: descriptor.id, localOverrides: json });
+    assert.equal(first.ok, false);
+    assert.doesNotMatch(JSON.stringify(first), /private-storage-value/);
+    assert.equal([...table.entries()].length, 0);
+    assert.equal(host.loader.entries.size, 0);
+    assert.equal([...host.tables.get('snapshots').entries()].length, 0);
+    assert.equal((await host.webCall('connect', { connectorId: descriptor.id, localOverrides: '{"argsAppend":["--safe"]}' })).ok, true);
+    const key = 'storage-overlay-main';
+    const snapshots = [...host.tables.get('snapshots').entries()].length;
+    const failed = await host.webCall('applyLocalOverrides', { key, json });
+    assert.equal(failed.ok, false);
+    assert.doesNotMatch(JSON.stringify(failed), /private-storage-value/);
+    assert.deepEqual((await table.get(key)).localOverrides, { argsAppend: ['--safe'] });
+    assert.deepEqual(host.loader.entries.get(`mcp-${key}`).options.config.args, ['server.js', '--safe']);
+    assert.equal([...host.tables.get('snapshots').entries()].length, snapshots);
+  } finally { for (const dispose of host.disposers) await dispose(); }
+});
+
+test('持续存储失败保留恢复快照且不宣称回滚成功（#165）', async () => {
+  const host = makePluginContext({ withWeb: true });
+  const { apply } = await import('../lib/index.js');
+  const id = 'recovery-overlay';
+  const key = `${id}-main`;
+  const descriptor = { id, name: 'Recovery overlay', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: id, transport: 'stdio', command: 'node', args: ['server.js'] }] };
+  const table = host.tables.get('connections');
+  const put = table.put.bind(table);
+  let failWrites = false;
+  table.put = async (...args) => {
+    if (failWrites) throw new Error('private-storage-value');
+    return put(...args);
+  };
+  try {
+    await apply(host.ctx, baseConfig({ connectors: [descriptor] }));
+    assert.equal((await host.webCall('connect', { connectorId: id, localOverrides: '{"argsAppend":["--safe"]}' })).ok, true);
+    failWrites = true;
+    const failed = await host.webCall('applyLocalOverrides', { key, json: '{"argsAppend":["--changed"]}' });
+    assert.equal(failed.ok, false);
+    assert.equal(failed.detail.recoveryRequired, true);
+    assert.match(failed.message, /回滚未完成/);
+    assert.doesNotMatch(JSON.stringify(failed), /private-storage-value|--safe|--changed/);
+    const snapshot = await host.tables.get('snapshots').get(failed.detail.snapshotId);
+    assert.deepEqual(snapshot.records[0].localOverrides.argsAppend, ['--safe']);
+    failWrites = false;
+    const restored = await host.webCall('restoreSnapshot', { snapshotId: failed.detail.snapshotId });
+    assert.equal(restored.ok, true, restored.message);
+    assert.deepEqual((await table.get(key)).localOverrides.argsAppend, ['--safe']);
+    assert.deepEqual(host.loader.entries.get(`mcp-${key}`).options.config.args, ['server.js', '--safe']);
+  } finally { failWrites = false; for (const dispose of host.disposers) await dispose(); }
+});
+
+test('本地参数持久化与回滚同时失败时不承诺未保存或恢复成功（#146）', async () => {
+  const host = makePluginContext({ withWeb: true });
+  const { apply } = await import('../lib/index.js');
+  const descriptor = { id: 'failed-rollback', name: 'Rollback failure', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: 'failed-rollback', transport: 'stdio', command: 'node', args: ['server.js'] }] };
+  const table = host.tables.get('connections');
+  const put = table.put.bind(table);
+  table.put = async (key, record) => { await put(key, record); throw new Error('synthetic-private-storage-failure'); };
+  table.delete = async () => { throw new Error('synthetic-private-rollback-failure'); };
+  try {
+    await apply(host.ctx, baseConfig({ connectors: [descriptor] }));
+    const result = await host.webCall('connect', { connectorId: descriptor.id, localOverrides: '{"argsAppend":["--test"]}' });
+    assert.equal(result.ok, false);
+    assert.match(result.message, /已尝试恢复原配置.*检查本机 Host 日志与连接状态/);
+    assert.doesNotMatch(JSON.stringify(result), /未保存|已恢复|synthetic-private/);
+    assert.equal(host.loader.entries.size, 0, 'owned Host entry is still removed');
+    assert.ok(await table.get('failed-rollback-main'), 'unrecoverable durable write is not misreported as absent');
+    assert.match(host.logs.join('\n'), /storage rollback/);
+  } finally { for (const dispose of host.disposers) await dispose(); }
+});
+
+test('本地参数重启恢复；停用连接不启动；市场授权变化阻止旧覆盖启动（#146）', async () => {
+  const { apply } = await import('../lib/index.js');
+  const descriptor = { id: 'restart-overlay', name: 'Restart overlay', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: 'restart-overlay', transport: 'stdio', command: 'node', args: ['server.js'] }] };
+  const key = 'restart-overlay-main';
+  const first = makePluginContext({ withWeb: true });
+  await apply(first.ctx, baseConfig({ connectors: [descriptor] }));
+  try {
+    assert.equal((await first.webCall('connect', { connectorId: descriptor.id, localOverrides: '{"argsAppend":["--safe"],"env":{"LOCAL":"test"},"cwd":"/tmp"}' })).ok, true);
+  } finally { for (const dispose of first.disposers) await dispose(); }
+  for (const mode of ['enabled', 'disabled', 'credential-bound']) {
+    const table = first.tables.get('connections');
+    await table.put(key, { ...await table.get(key), enabled: mode !== 'disabled' });
+    const changed = structuredClone(descriptor);
+    if (mode === 'credential-bound') {
+      changed.auth = { mode: 'api-key', credentialFields: [{ key: 'apiKey', label: 'API Key', required: true, secret: true }] };
+      changed.servers[0].credentialBindings = { TOKEN: 'apiKey' };
+    }
+    const restarted = makePluginContext({ shared: { tables: first.tables }, withWeb: true });
+    try {
+      await apply(restarted.ctx, baseConfig({ connectors: [changed] }));
+      const entry = restarted.loader.entries.get(`mcp-${key}`);
+      if (mode === 'enabled') {
+        const args = entry.options.config.args;
+        assert.match(args[0], /stdio-startup-guard\.js$/);
+        assert.deepEqual(args.slice(args.indexOf('--') + 1), ['node', 'server.js', '--safe']);
+        assert.equal(entry.options.config.env.LOCAL, 'test');
+        assert.equal(entry.options.config.cwd, '/tmp');
+      } else {
+        assert.equal(entry, undefined, mode);
+      }
+      assert.deepEqual((await table.get(key)).localOverrides.argsAppend, ['--safe'], 'stored overlay preserved for recovery');
+      if (mode === 'credential-bound') assert.match(restarted.logs.join('\n'), /不再允许本地参数覆盖/);
+    } finally { for (const dispose of restarted.disposers) await dispose(); }
+  }
+});
+
+test('首次市场连接前设置本地参数；失败不落库，修正可重试，授权配置拒绝覆盖（#146）', async () => {
+  let starts = 0;
+  const { ctx, loader, tables, webCall, disposers } = makePluginContext({ withWeb: true, loaderHooks: {
+    onCreate: ({ config }) => {
+      starts++;
+      if (!config.args?.includes('--executablePath')) throw new Error('synthetic-private-startup');
+    },
+  } });
+  const { apply } = await import('../lib/index.js');
+  const connector = { id: 'first-overlay', name: 'First overlay', auth: { mode: 'none' }, servers: [{ serverKey: 'main', serverName: 'first-overlay', transport: 'stdio', command: 'node', args: ['server.js'] }] };
+  const oauth = { id: 'oauth-overlay', name: 'OAuth', auth: { mode: 'oauth2-pkce' }, servers: [{ serverKey: 'main', serverName: 'oauth-overlay', url: 'https://example.com/mcp' }] };
+  try {
+    await apply(ctx, baseConfig({ connectors: [connector, oauth] }));
+    const first = await webCall('connect', { connectorId: connector.id, localOverrides: '{"argsAppend":["--wrong"]}' });
+    assert.equal(first.ok, false);
+    assert.doesNotMatch(JSON.stringify(first), /synthetic-private-startup/);
+    assert.equal([...tables.get('connections').entries()].length, 0);
+    assert.equal([...tables.get('snapshots').entries()].length, 0);
+    assert.equal(loader.entries.size, 0);
+    const invalid = await webCall('connect', { connectorId: connector.id, localOverrides: '{"command":"other"}' });
+    assert.equal(invalid.ok, false);
+    assert.equal(starts, 1, 'invalid overrides rejected before starting');
+    const denied = await webCall('connect', { connectorId: oauth.id, localOverrides: '{}' });
+    assert.equal(denied.ok, false);
+    assert.match(denied.message, /不可覆盖授权配置/);
+    const result = await webCall('connect', { connectorId: connector.id, localOverrides: JSON.stringify({ argsAppend: ['--executablePath', 'C:\\Program Files\\Browser\\browser.exe'], env: { TEST: 'synthetic-value' } }) });
+    assert.equal(result.ok, true, result.message);
+    assert.deepEqual(loader.entries.get('mcp-first-overlay-main').options.config.args, ['server.js', '--executablePath', 'C:\\Program Files\\Browser\\browser.exe']);
+    const record = await tables.get('connections').get('first-overlay-main');
+    assert.deepEqual(record.args, ['server.js']);
+    assert.equal(record.localOverrides.env.TEST, 'synthetic-value');
+    assert.doesNotMatch(JSON.stringify(result), /synthetic-value|Program Files/);
+    assert.equal((await webCall('connect', { connectorId: connector.id })).ok, true);
+    assert.deepEqual((await tables.get('connections').get('first-overlay-main')).localOverrides, record.localOverrides);
+  } finally { for (const dispose of disposers) await dispose(); }
+});
 
 test('configure 无顶层 anyOf 时仍拒绝缺失参数且不创建连接、快照或 Host 服务（#89）', async () => {
   const { ctx, tools, tables, loader, disposers } = makePluginContext();
@@ -220,6 +540,62 @@ test('后台发现覆盖手动、JSON、目录连接，缓存隔离且断网恢�
     assert.ok(!methods.includes('tools/call'));
   } finally {
     disposers.forEach((dispose) => dispose());
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('同名工具参数增删改经真实 HTTP 发现更新缓存，失败不覆盖成功记录', { timeout: 15000 }, async () => {
+  let offline = false;
+  let inputSchema = { type: 'object', properties: { query: { type: 'string' } } };
+  const methods = [];
+  const server = createServer(async (req, res) => {
+    if (req.method === 'DELETE') { res.writeHead(204); res.end(); return; }
+    let body = ''; for await (const chunk of req) body += chunk;
+    const request = JSON.parse(body || '{}'); methods.push(request.method);
+    if (offline) { res.writeHead(503); res.end(); return; }
+    if (!request.id) { res.writeHead(202); res.end(); return; }
+    const result = request.method === 'tools/list' ? { tools: [{ name: 'lookup', inputSchema }] }
+      : { protocolVersion: '2025-03-26', capabilities: { tools: {} }, serverInfo: { name: 'schema-fixture', version: '1' } };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }));
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const plugin = makePluginContext();
+  const execute = (name, input) => plugin.tools.defs.get(`mcp_connector_${name}`).execute(input, { signal: new AbortController().signal });
+  try {
+    const { apply } = await import('../lib/index.js');
+    await apply(plugin.ctx, baseConfig());
+    assert.equal((await execute('configure', { name: 'Schema fixture', serverName: 'schema-fixture', url: `http://127.0.0.1:${server.address().port}/mcp` })).ok, true);
+    await waitFor(() => [...plugin.tables.get('tool_catalog').entries()].length === 1);
+    const detail = async () => (await execute('tool_detail', { connectionKey: 'custom-schema-fixture', toolName: 'lookup' })).detail.tool;
+    const first = await detail();
+    assert.deepEqual(first.inputSchema, inputSchema);
+    const input = { connectorId: first.connectorId, connectionKey: first.connectionKey };
+    for (const next of [inputSchema,
+      { type: 'object', properties: { query: { type: 'string' }, page: { type: 'number' } } },
+      { type: 'object', properties: { query: { type: 'string' } } },
+      { type: 'object', properties: { query: { type: 'number' } }, required: ['query'] },
+    ]) {
+      inputSchema = next;
+      assert.equal((await execute('tools_list', input)).ok, true);
+      assert.deepEqual((await detail()).inputSchema, next);
+    }
+    const last = await detail();
+    offline = true;
+    const failed = await execute('tools_list', input);
+    assert.equal(failed.ok, false);
+    assert.equal(failed.detail.servers[0].cached, true);
+    assert.deepEqual((await detail()).inputSchema, last.inputSchema);
+    assert.equal((await detail()).observedAt, last.observedAt);
+    offline = false;
+    assert.equal((await execute('tools_list', input)).ok, true);
+    inputSchema = { type: 'object', properties: { query: { type: 'string', default: 'private-schema-marker' } } };
+    await execute('tools_list', input);
+    assert.equal((await detail()).schemaTruncated, true);
+    assert.doesNotMatch(JSON.stringify([...plugin.tables.get('tool_catalog').entries()]), /private-schema-marker/);
+    assert.ok(!methods.includes('tools/call'));
+  } finally {
+    plugin.disposers.forEach((dispose) => dispose());
     await new Promise((resolve) => server.close(resolve));
   }
 });
@@ -1669,7 +2045,7 @@ test('stdio 市场凭据绑定：多字段只在本机注入 env，目录和状�
       credentialBindings: { VENDOR_API_TOKEN: 'apiToken', VENDOR_REGION: 'region' },
     }],
   };
-  const { ctx, loader, tools, tables, logs } = makePluginContext();
+  const { ctx, loader, tools, tables, logs, webCall } = makePluginContext({ withWeb: true });
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig({ connectors: [connector] }));
 
@@ -1714,6 +2090,11 @@ test('stdio 市场凭据绑定：多字段只在本机注入 env，目录和状�
     VENDOR_REGION: 'region',
   });
   assert.doesNotMatch(JSON.stringify({ connect, configured, catalog, status, logs }), /stdio-local-secret/);
+  assert.equal(status.detail.items[0].canEditLocalOverrides, false);
+  const denied = await webCall('applyLocalOverrides', { key: 'stdio-secure-market-main', json: '{"env":{"VENDOR_API_TOKEN":"replacement"}}' });
+  assert.equal(denied.ok, false, 'credential bindings must not be replaceable through the overlay API');
+  assert.equal((await webCall('editableLocalOverrides', { key: 'stdio-secure-market-main' })).ok, false);
+  assert.equal(loader.entries.get('mcp-stdio-secure-market-main').options.config.env.VENDOR_API_TOKEN, 'stdio-local-secret');
 });
 
 test('目录识别旧版 API Key 单入口并提示升级 OAuth 一键授权', async () => {

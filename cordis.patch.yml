@@ -11,6 +11,9 @@
         refreshSkewMs: 300000
         openBrowser: true
         showSidebarEntry: true
+        # true：仅注册发现与会话两个管理入口；完整连接配置仍在界面操作。
+        # 保持 false 兼容已有对话/自动化；更改后重载插件。
+        compactManagementTools: false
         # 面板 CSP frame-ancestors 白名单：默认仅同源可嵌入。
         # 桌面壳（Tauri/Electron）内嵌面板时需显式追加外壳源，
         # 例如 ['self', 'http://tauri.localhost', 'tauri://localhost']。

@@ -85,7 +85,7 @@ If the plugin helps you connect an MCP server faster, consider [starring the rep
 - Explicit, non-destructive migration from the two earlier Qichacha OAuth plugins, plus active-plugin conflict detection that blocks duplicate server management and credential overwrites.
 
 <!-- catalog-stats:start -->
-As of 2026-10-06, the public Registry publishes 109 connector descriptors. After merging and deduplicating them with the 4 bundled Qichacha cards, the Marketplace exposes 113 cards across 9 business categories. Recommendations remain limited to the four Qichacha cards, PKULaw, and Wind, for 6 featured cards in total. The Registry evolves independently; the badge shown after a client refresh and the live badges above are the authoritative current counts.
+As of 2026-10-17, the public Registry publishes 110 connector descriptors. After merging and deduplicating them with the 4 bundled Qichacha cards, the Marketplace exposes 114 cards across 9 business categories. Recommendations remain limited to the four Qichacha cards, PKULaw, and Wind, for 6 featured cards in total. The Registry evolves independently; the badge shown after a client refresh and the live badges above are the authoritative current counts.
 <!-- catalog-stats:end -->
 
 ## Interface and demo
@@ -167,6 +167,7 @@ The default bundle configuration is in `cordis.patch.yml`:
     refreshSkewMs: 300000
     openBrowser: true
     showSidebarEntry: true
+    compactManagementTools: false
     frameAncestors: ['self']
 ```
 
@@ -177,6 +178,15 @@ Remote catalog requests (including the fallback source) honor `HTTP_PROXY`, `HTT
 The proxy variables must be present in the running DSH process. After changing them, fully exit and restart DSH Desktop or launch `dsh web` from a shell with those variables set; changing Windows user environment variables does not update an already-running process. The connector does not read OS proxy settings or infer a local proxy address.
 
 `showSidebarEntry` defaults to `true`. Users can override it from the DSH plugin configuration page; turning it off hides only the shortcut and does not disable the connector, connected MCP servers, or tools.
+
+`compactManagementTools` defaults to `false` for backward compatibility. Set it to `true` in the plugin configuration and reload the plugin (or restart DSH) to expose only two management tools at the next inference boundary:
+
+- `mcp_connector_discover`: fixed read-only actions `catalog`, `status`, `search` (requires `query`), and `detail` (requires `toolName`). Example: `{"action":"search","query":"weather","limit":5}`.
+- `mcp_connector_session_tools`: unchanged session activation, confirmation and TTL behavior.
+
+Use the connector UI for connection setup, authorization, import, editing, snapshots and migration. There is no arbitrary execution proxy or automatic management-tool loading. Keep this option `false` for conversation-only deployments or workflows that depend on legacy tool names. Set it back to `false` and reload to restore those names; do not run duplicate plugin instances.
+
+This setting does not hide downstream business tools, disable connections, migrate credentials, change workspace/governance rules or bypass Host approval. Use the existing session injection mode for downstream tool visibility. Reduced tool count/schema size is not a measured token or cost saving.
 
 `frameAncestors` defaults to `['self']`: the CSP of the panel page (`/mcp-connector/ui/`) only allows same-origin embedding, which is the existing behaviour and is not relaxed by default. When a desktop shell (Tauri/Electron) embeds the panel, the ancestor origin differs from the panel origin, so the browser blocks it with `Framing '...' violates the following Content Security Policy directive: "frame-ancestors 'self'"` and the panel renders blank. Deployers must opt in explicitly:
 
@@ -215,7 +225,7 @@ npm run dev:ui
 
 Every Registry merge regenerates `catalog-stats.json`; an hourly workflow in this repository synchronizes the Chinese and English product copy plus a local stats snapshot. The static npm README updates with package releases, while the live badges above read the Registry directly and therefore stay current without another npm release.
 
-The current public version is [`dsh-mcp-connector@0.2.72`](https://www.npmjs.com/package/dsh-mcp-connector), with [GitHub Release v0.2.72](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.72).
+The current public version is [`dsh-mcp-connector@0.2.76`](https://www.npmjs.com/package/dsh-mcp-connector), with [GitHub Release v0.2.76](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.76).
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [docs/DESKTOP-E2E.md](docs/DESKTOP-E2E.md) for the Desktop release checklist.
 

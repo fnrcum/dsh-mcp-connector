@@ -73,6 +73,7 @@ dsh plugin --profile web add dsh-mcp-connector
 - 市场 Bearer/API Key 连接器先执行 MCP initialize 连通性与凭据校验，全部 HTTP Server 通过后才持久化凭据并进入“已安装”；stdio 卡片可声明多个本机凭据字段及其环境变量映射。
 - 生命周期管理：连接持久化、重启恢复、启停、断开、OAuth 自动刷新/退避恢复与撤销；同 issuer 卡片共享一次授权，跨进程锁与独立原子 Grant journal 防止 Desktop/Web 并行时重复消耗 Refresh Token。
 - 配置原地编辑：自定义和 JSON 导入连接可在“已安装”中编辑标准化 JSON 并重新连接；敏感值以本机保留标记处理，校验、启动或保存失败时原连接继续可用。
+- 本地参数覆盖（#146，0.2.76）：无凭据市场 stdio 连接支持在首次连接确认框填写“高级本地参数”，以及在已安装列表编辑 `argsAppend`、`env`、`cwd`，不修改目录或连接身份；已有值不回传浏览器，支持快照恢复和清除覆盖。首次连接留空沿用市场参数，已有连接留空保留原覆盖；启动失败保留表单可修改重试。不支持 OAuth、凭据绑定、CLI 桥接或完整参数替换；真实 Desktop/Windows 验收尚未完成。
 - 配置备份：一键复制/下载可再次导入的脱敏 JSON；连接变更前自动保存最多 20 个本机快照，支持预览与原子恢复。凭据、本地路径和 OAuth Grant 不进入导出结果。
 - 连接作用域：新连接可选当前 Workspace 项目或 profile 全局；支持先预览 Server/工具影响，再复制、移动或按 revision 回滚。凭据只存一份，project-only 工具由 DSH Host 强制隔离。
 - 三层治理：Connection、Server、Tool 规则按 Tool > Server > Connection > 默认允许解析；变更先预览、按 revision 提交并可回滚，由 DSH Host 的 schema/lookup/dispatch restriction 与最终执行 Guard 真实生效。
@@ -86,7 +87,7 @@ dsh plugin --profile web add dsh-mcp-connector
 - 对话工具：`mcp_connector_catalog`、`connect`、`configure`、`import_json`、`export_config`、`snapshot`、`install_from_url`、`status`、`scope`、`health_check`、`policy`、`set_enabled`、`session_tools`、`disconnect`、`refresh_catalog`、`publish`、`tools_list`、`tool_search`、`tool_detail`。搜索/详情只做渐进式能力发现，不执行目标 MCP 工具。
 
 <!-- catalog-stats:start -->
-截至 2026-10-06，公共 Registry 已发布 109 条连接器描述；与随包的 4 张企查查卡片合并去重后，市场页可浏览 113 张卡片，覆盖企业数据、金融投资、法律合规、开发工具、办公协作、调研分析、设计创意、效率工具、其他 9 类。推荐位严格保留 4 张企查查卡片、北大法宝和 Wind，共 6 张；其他连接器按业务分类展示。Registry 可独立持续更新，实际数量以客户端刷新后的市场页签徽标和上方实时统计徽标为准。
+截至 2026-10-17，公共 Registry 已发布 110 条连接器描述；与随包的 4 张企查查卡片合并去重后，市场页可浏览 114 张卡片，覆盖企业数据、金融投资、法律合规、开发工具、办公协作、调研分析、设计创意、效率工具、其他 9 类。推荐位严格保留 4 张企查查卡片、北大法宝和 Wind，共 6 张；其他连接器按业务分类展示。Registry 可独立持续更新，实际数量以客户端刷新后的市场页签徽标和上方实时统计徽标为准。
 <!-- catalog-stats:end -->
 
 ## 界面与演示
@@ -162,6 +163,7 @@ Bundle 默认配置位于 `cordis.patch.yml`：
     refreshSkewMs: 300000
     openBrowser: true
     showSidebarEntry: true
+    compactManagementTools: false
     frameAncestors: ['self']
 ```
 
@@ -172,6 +174,14 @@ Bundle 默认配置位于 `cordis.patch.yml`：
 代理变量必须存在于正在运行的 DSH 进程中。修改后请完全退出并重启 DSH Desktop，或从已设置变量的终端启动 `dsh web`；修改 Windows 用户环境变量不会更新已有进程。连接器不会读取系统代理设置，也不会猜测本机代理地址。
 
 `showSidebarEntry` 默认为 `true`。用户可在 DSH 插件配置页覆盖该值；关闭后只隐藏侧边栏快捷入口，不停用连接器、已连接 MCP Server 或工具。
+
+`compactManagementTools` 默认为 `false`，兼容原有对话管理工具。希望降低管理工具上下文开销时，可在插件配置中设为 `true` 并重载插件（必要时重启 DSH），下一次推理使用新工具集：
+
+- 只注册 `mcp_connector_discover`（市场、连接状态、缓存工具搜索/详情）和 `mcp_connector_session_tools`（原有会话工具可见性管理）两个入口。
+- 连接、授权、编辑、导入、快照、迁移等管理操作使用 **MCP连接器界面**；精简模式没有任意工具执行代理，也不自动加载全部管理工具。纯对话部署或依赖旧工具名的自动化应保持 `false`。
+- 此开关不减少已连接服务的业务工具数量，不停用连接、不迁移凭据、不修改作用域/治理规则。业务工具需要按需可见时，仍使用原有“按会话启用”。会话确认、TTL 与 Host 审批保持不变。
+- 例如发现入口可用 `{"action":"search","query":"天气","limit":5}`；查询连接状态可用 `{"action":"status"}`。详情使用 `action=detail` 和必填 `toolName`，市场搜索使用 `action=catalog` 与可选 `keyword`。
+- 设回 `false` 并重载插件可恢复旧管理工具名；不要同时运行两份插件。工具数量和 schema 大小的减少不等于实测 token 或费用节省。
 
 `frameAncestors` 默认为 `['self']`，即面板页面（`/mcp-connector/ui/`）的 CSP 只允许同源页面内嵌，是既有行为，不做任何放宽。在桌面壳（Tauri/Electron）里把面板嵌进壳窗口时，祖先源与面板自身不同源，浏览器会以 `Framing '...' violates the following Content Security Policy directive: "frame-ancestors 'self'"` 拦截并导致面板白屏；此时需要由部署方/用户显式追加外壳源：
 
@@ -210,7 +220,7 @@ npm run dev:ui
 
 公共 Registry 每次合并后会生成 `catalog-stats.json`；本仓库的定时工作流每小时同步中英文介绍和统计快照。npm 页面中的静态正文随版本发布更新，上方动态统计徽标则直接读取 Registry，可在不发布新 npm 版本时保持实时数量一致。
 
-当前公开版本为 [`dsh-mcp-connector@0.2.72`](https://www.npmjs.com/package/dsh-mcp-connector)，对应 [GitHub Release v0.2.72](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.72)。
+当前公开版本为 [`dsh-mcp-connector@0.2.76`](https://www.npmjs.com/package/dsh-mcp-connector)，对应 [GitHub Release v0.2.76](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.76)。
 
 版本能力与变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 Desktop 发版回归见 [docs/DESKTOP-E2E.md](docs/DESKTOP-E2E.md)。

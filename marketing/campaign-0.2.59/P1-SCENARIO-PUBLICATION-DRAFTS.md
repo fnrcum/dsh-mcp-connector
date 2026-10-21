@@ -1,5 +1,17 @@
 # 0.2.59 首次成功场景推广草稿（未发布）
 
+## 2026-10-15 统一复核
+
+本文件是历史活动草稿，不是当前版本发布公告。当前正式版本已到 0.2.73；安装入口使用 npm latest，不把草稿版本作为安装目标。三个场景仍可作为选题，但缺少外部发布平台、账号及发布直链，不标记已公开发布。
+
+当前三条任务教程、发布所有权缺口和素材更新清单统一维护在 [`marketing/P1-FIRST-SUCCESS-PUBLICATION-PACK-2026-10-16.md`](../P1-FIRST-SUCCESS-PUBLICATION-PACK-2026-10-16.md)；本历史草稿不再承担当前发布入口。
+
+已有三张工具工作台截图与43秒GIF（v0.2.46无凭据Mock），无需重复记为“尚未制作”；若复用必须标明历史演示，不能伪装最新版实拍或真实授权结果。10月2日/9日复盘日期已过，下方占位不再代表未来任务：场景调用及发帖证据未找到，记“未核验”，下载补查见 docs/GROWTH-BASELINE.md。
+
+统一传播定位：**DeepSeek Harness 的 MCP连接与管理面板：发现服务、配置授权、查找工具、诊断连接。**
+
+对外链接使用 [项目首页](https://github.com/duhu2000/dsh-mcp-connector)、[首次成功教程](https://github.com/duhu2000/dsh-mcp-connector/blob/main/docs/tutorials/README.md)、[npm安装入口](https://www.npmjs.com/package/dsh-mcp-connector)。不宣称全生态第一或保证下载持续增长。
+
 状态：**仅本地/仓库草稿**。截至 2026-09-29，未指定发布平台、账号、审批人或发布日期；不得自动公开发布。正式入口统一指向 [`docs/tutorials/FIRST-SUCCESS-SCENARIOS.md`](../../docs/tutorials/FIRST-SUCCESS-SCENARIOS.md)，安装与连接入口为 [`docs/tutorials/README.md`](../../docs/tutorials/README.md)。
 
 文案沿用可核验能力和核心检索短语：MCP连接器、MCP Server、连接管理、跨连接工具搜索、连接排障。不得承诺永久排名、全部账号可用、全部连接器免费或场景已真实调用成功。

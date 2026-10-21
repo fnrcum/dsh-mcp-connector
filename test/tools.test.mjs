@@ -2,6 +2,96 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerTools, toLossless } from '../lib/tools.js';
 
+function captureTools(api = {}, options = {}) {
+  const tools = new Map();
+  const dispose = registerTools({ tools: { register(def) {
+    tools.set(def.name, def);
+    return () => tools.delete(def.name);
+  } } }, api, options);
+  return { tools, dispose };
+}
+
+test('精简模式只注册两个入口，默认保留全部旧工具且卸载无残留（#161）', () => {
+  const full = captureTools();
+  const compact = captureTools({}, { compact: true });
+  assert.equal(full.tools.size, 25);
+  assert.deepEqual([...compact.tools.keys()], ['mcp_connector_discover', 'mcp_connector_session_tools']);
+  assert.equal(compact.tools.has('mcp_connector_configure'), false);
+  const schemas = (tools) => JSON.stringify([...tools.values()].map(({ name, description, parameters }) => ({ name, description, parameters })));
+  assert.ok(schemas(compact.tools).length < schemas(full.tools).length * 0.35, '仅比较 schema 字符数，不声称 token 数');
+  assert.deepEqual(compact.tools.get('mcp_connector_session_tools').parameters, full.tools.get('mcp_connector_session_tools').parameters);
+  compact.dispose();
+  full.dispose();
+  assert.equal(compact.tools.size, 0);
+  assert.equal(full.tools.size, 0);
+});
+
+test('精简发现按固定白名单分派，保留原始结果渲染与工作区过滤参数', async () => {
+  const calls = [];
+  const api = Object.fromEntries(['catalog', 'status', 'toolSearch', 'toolDetail'].map((name) => [name, async (args) => {
+    calls.push([name, args]);
+    return { ok: true, message: name, detail: { items: [], tool: { description: 'demo', inputSchema: { type: 'object' } }, missing: undefined } };
+  }]));
+  const { tools } = captureTools(api, { compact: true });
+  const discover = tools.get('mcp_connector_discover');
+  for (const [action, args, method] of [
+    ['catalog', { keyword: '企查查', category: '企业数据', workspaceId: 'ws' }, 'catalog'],
+    ['status', { workspaceId: 'ws' }, 'status'],
+    ['search', { query: 'weather', connectionKey: 'key', connectorId: 'demo', workspaceId: 'ws', limit: 5 }, 'toolSearch'],
+    ['detail', { toolName: 'weather', connectionKey: 'key', connectorId: 'demo', serverName: 'demo', workspaceId: 'ws' }, 'toolDetail'],
+  ]) {
+    const result = await discover.execute({ action, ...args });
+    assert.equal(result.ok, true);
+    assert.equal(result.discoveryAction, action);
+    assert.equal(result.detail.missing, null);
+    assert.deepEqual(calls.at(-1), [method, args]);
+    assert.match(discover.output.render(args, result)[0].text, new RegExp(method));
+  }
+  assert.equal(calls.length, 4);
+});
+
+test('精简入口拒绝未知操作、跨 action 参数和非法值，不调用任何 API', async () => {
+  const api = new Proxy({}, { get() { assert.fail('invalid input reached API'); } });
+  const { tools } = captureTools(api, { compact: true });
+  const discover = tools.get('mcp_connector_discover');
+  for (const input of [
+    null, [], {}, { action: { toString: 'invalid' } }, { action: ['status'] },
+    { action: 'configure' }, { action: 'disconnect' }, { action: 'constructor' },
+    { action: '__proto__' }, { action: 'migrateLegacy' }, { action: 'call', toolName: 'dangerous' },
+    { action: 'search' }, { action: 'search', query: '  ' }, { action: 'detail' },
+    { action: 'status', bearerToken: 'secret-sentinel' }, { action: 'status', query: 'x' },
+    { action: 'search', query: 'x', limit: NaN }, { action: 'search', query: 'x', limit: 101 },
+    { action: 'search', query: 'x', limit: 0 }, { action: 'catalog', workspaceId: {} },
+  ]) {
+    const result = await discover.execute(input);
+    assert.equal(result.ok, false);
+    assert.doesNotMatch(JSON.stringify(result), /secret-sentinel/);
+    assert.doesNotThrow(() => discover.output.render(input, result));
+  }
+});
+
+test('精简模式保留会话激活原有参数和可信执行上下文，不代为执行目标工具', async () => {
+  const exec = { agent: { id: 'agent-1' }, signal: new AbortController().signal };
+  const args = { action: 'activate', publicNames: ['mcp__demo__search'], confirmed: false, expectedRevision: 3 };
+  const { tools } = captureTools({ sessionTools: async (actual, context) => {
+    assert.equal(actual, args);
+    assert.equal(context, exec);
+    return { ok: false, message: '需要用户明确确认' };
+  } }, { compact: true });
+  const result = await tools.get('mcp_connector_session_tools').execute(args, exec);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /明确确认/);
+});
+
+test('精简工具注册中途失败会释放已注册入口', () => {
+  let cleaned = 0;
+  assert.throws(() => registerTools({ tools: { register(def) {
+    if (def.name === 'mcp_connector_session_tools') throw new Error('registration failure');
+    return () => { cleaned++; };
+  } } }, {}, { compact: true }), /registration failure/);
+  assert.equal(cleaned, 1);
+});
+
 test('所有自有工具入参为 object 且不含 provider 拒绝的顶层组合约束（#89）', () => {
   const defs = [];
   registerTools({ tools: { register(def) { defs.push(def); return () => {}; } } }, {});
