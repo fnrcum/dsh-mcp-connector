@@ -1001,7 +1001,22 @@
     ["重新建立 Host 侧条目并复检：不改配置、凭据、范围或注入模式", "Re-establish the Host-side entry and recheck it: configuration, credentials, scope, and injection mode are unchanged"],
     ["扫描企查查旧 OAuth 插件；不会删除旧插件或原凭据", "Scan for the legacy Qichacha OAuth plugin; the old plugin and original credentials are not deleted"],
     ["检测企查查旧授权", "Detect legacy Qichacha authorization"],
-    ["断开连接", "Disconnect"]
+    ["断开连接", "Disconnect"],
+    ["清除本地参数", "Clear local parameters"],
+    ["本地参数 · ", "Local parameters · "],
+    ["本地参数 JSON", "Local parameters JSON"],
+    ["本地参数", "Local parameters"],
+    ["高级：首次连接前设置本地参数（可选）", "Advanced: set local parameters before first connect (optional)"],
+    ["留空使用市场参数（已有连接保留原覆盖）。argsAppend 追加命令参数，env 合并环境变量，cwd 设置工作目录；仅保存在本机。可用于指定浏览器路径或代理。参数可能扩大本地访问权限，请仅填写可信内容；启动失败时保留表单供修改重试。", "Leave empty to use market parameters (existing connections keep their current overrides). argsAppend appends command arguments, env merges environment variables, and cwd sets the working directory; values stay on this machine only. Useful for browser paths or proxies. Parameters can widen local access — fill in only trusted content. If startup fails, the form is kept so you can edit and retry."],
+    ["仅覆盖本机，无需修改市场目录", "Override this machine only; no market catalog changes required"],
+    [" 追加到市场参数末尾；", " is appended after the market arguments; "],
+    [" 合并环境变量；", " merges environment variables; "],
+    [" 设置工作目录。命令、连接身份与市场默认值保持不变。参数可能扩大本地访问权限，请仅填写可信内容。", " sets the working directory. The command, connection identity, and market defaults stay unchanged. Parameters can widen local access — fill in only trusted content."],
+    [" 保留本机已有值；删除字段清除该项覆盖。保存会创建快照并重新加载已启用连接，停用连接保持停用；不代表工具调用已验收。", " keeps the existing local value; delete a field to clear that override. Saving creates a snapshot and reloads enabled connections; disabled connections stay disabled. This does not mean tool calls have been accepted."],
+    ["恢复市场参数", "Restore market parameters"],
+    ["保存本地参数", "Save local parameters"],
+    ["清除本机追加参数、环境变量和工作目录覆盖；已启用连接将重新加载。", "Clear this machine's appended arguments, environment variables, and working-directory overrides; enabled connections will be reloaded."],
+    ["正在更新本地参数…", "Updating local parameters…"]
   ];
   I18N_FRAGMENTS.sort((a, b) => b[0].length - a[0].length);
   function L(input) {
@@ -2369,7 +2384,7 @@
     async openEditor(key) { await openConnectionEditor(key); },
     async openLocalEditor(key) { await openLocalEditor(key); },
     async submitLocalOverrides(key, reset = false) {
-      if (reset && !await confirmDialog({ title: '恢复市场参数', message: '清除本机追加参数、环境变量和工作目录覆盖；已启用连接将重新加载。', confirmLabel: '恢复' })) return;
+      if (reset && !await confirmDialog({ title: L('恢复市场参数'), message: L('清除本机追加参数、环境变量和工作目录覆盖；已启用连接将重新加载。'), confirmLabel: L('恢复') })) return;
       const json = $('#local-overrides-json')?.value || '{}';
       setModalBusy(true, '正在更新本地参数…');
       const result = await call('applyLocalOverrides', { key, json, reset });
