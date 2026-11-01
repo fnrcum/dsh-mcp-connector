@@ -8,7 +8,27 @@ OAuth 是否可用取决于服务商的客户端注册、账号权限与授权�
 
 > 注：“技能扩展”指通过 MCP 工具和 Prompt 扩展智能体能力，本包不会伪装成独立 DSH Skill。
 
-[English](README.en.md)
+[English documentation](https://github.com/duhu2000/dsh-mcp-connector/blob/main/README.en.md) · [English overview](#english-overview)
+
+### English overview
+
+**MCP Connector for DeepSeek Harness** brings server setup, authorization, cross-connection tool search and troubleshooting into one panel. Browse a continuously updated catalog of 100+ connectors; connect through OAuth 2.0 PKCE, API keys, Streamable HTTP/stdio or `mcpServers` JSON import.
+
+Install with `dsh plugin --profile web add dsh-mcp-connector`, then select **EN** in the toolbar. The interface supports Chinese and English; provider descriptions and user content keep their original language. Provider accounts, permissions and any provider fees are separate from this plugin. Saving a connection or discovering tools does not guarantee a successful business call.
+
+![MCP Connector — English interface](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/01-market-overview.jpg)
+
+*Credential-free Mock demonstration; counts are fixtures, not production statistics.* [Full English guide and demo](https://github.com/duhu2000/dsh-mcp-connector/blob/main/README.en.md)
+
+### 中文界面与使用说明
+
+**中英文界面：** 顶部工具栏直接展示「中文 / EN」按钮，完整语言名称保留在提示中，并记住当前浏览器中的主动选择。插件 Host 默认跟随 DSH 显式语言偏好，缺失时保持中文；可配置 `locale: zh-CN` 或 `locale: en`。面板切换不重启 DSH；详情见 [语言设置](docs/I18N.md)。
+
+### 首页推荐
+
+首页“推荐”默认展开十张卡片：企查查·企业工商、腾讯文档、飞书开放平台、Notion、GitHub、Playwright、Wind·股票数据、企查查·法律数据、高德地图、Context7。按固定顺序展示，不因连接状态重排；这是场景推荐，不是使用量排行。接入时仍需满足各服务的授权和配置条件。
+
+![Homepage recommendations](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/08-ten-recommendations.jpg)
 
 ### 工具查找与故障处理
 
@@ -30,13 +50,19 @@ OAuth 是否可用取决于服务商的客户端注册、账号权限与授权�
 [![Registry connectors](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fduhu2000%2Fdsh-mcp-connector-registry%2Fmain%2Fcatalog-stats.json&query=%24.registryCount&label=Registry%20connectors&color=5865f2)](https://github.com/duhu2000/dsh-mcp-connector-registry/blob/main/catalog-stats.json)
 [![Marketplace cards](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fduhu2000%2Fdsh-mcp-connector-registry%2Fmain%2Fcatalog-stats.json&query=%24.marketCount&label=Marketplace%20cards&color=16a34a)](https://github.com/duhu2000/dsh-mcp-connector-registry/blob/main/catalog-stats.json)
 
-## 30 秒开始
+## 开始使用
+
+在插件市场搜索完整包名 **`dsh-mcp-connector`**，或在本机终端运行下方命令。当前默认 Desktop 和 Web 都使用 `web` profile；自定义部署请以宿主实际加载的 profile 为准。
 
 ```bash
 dsh plugin --profile web add dsh-mcp-connector
 ```
 
 安装或升级后完全重启 DeepSeek Harness Desktop 或 `dsh web`，然后打开左侧「MCP连接器」；也可从“设置 → 插件 → 插件配置 → MCP连接器”直接打开。
+
+Desktop 需要完全退出并重新启动应用；Web 需要停止原 `dsh web` 进程再启动，只刷新网页不会重新加载后端插件。
+
+**先完成一件事：**[查询一家企业的简介](docs/tutorials/ONE-SUCCESS-CASE.md)，按步骤核对授权、工具来源和真实返回。想写体验文章？使用[社区分享素材包](docs/tutorials/SHARING-KIT.md)，包含演示素材、文章提纲和脱敏记录模板。
 
 首次使用建议依次确认：连接已保存且范围正确 → “工具”页能找到预期工具与来源 → 在正常 DSH 会话中通过 Host 审批链完成一次服务商许可的只读调用。缓存可见不等于当前服务可调用。
 
@@ -87,7 +113,7 @@ dsh plugin --profile web add dsh-mcp-connector
 - 对话工具：`mcp_connector_catalog`、`connect`、`configure`、`import_json`、`export_config`、`snapshot`、`install_from_url`、`status`、`scope`、`health_check`、`policy`、`set_enabled`、`session_tools`、`disconnect`、`refresh_catalog`、`publish`、`tools_list`、`tool_search`、`tool_detail`。搜索/详情只做渐进式能力发现，不执行目标 MCP 工具。
 
 <!-- catalog-stats:start -->
-截至 2026-10-17，公共 Registry 已发布 110 条连接器描述；与随包的 4 张企查查卡片合并去重后，市场页可浏览 114 张卡片，覆盖企业数据、金融投资、法律合规、开发工具、办公协作、调研分析、设计创意、效率工具、其他 9 类。推荐位严格保留 4 张企查查卡片、北大法宝和 Wind，共 6 张；其他连接器按业务分类展示。Registry 可独立持续更新，实际数量以客户端刷新后的市场页签徽标和上方实时统计徽标为准。
+截至 2026-10-24，公共 Registry 已发布 112 条连接器描述；与随包的 4 张企查查卡片合并去重后，市场页可浏览 116 张卡片，覆盖企业数据、金融投资、法律合规、开发工具、办公协作、调研分析、设计创意、效率工具、其他 9 类。推荐位严格保留 4 张企查查卡片、北大法宝和 Wind，共 6 张；其他连接器按业务分类展示。Registry 可独立持续更新，实际数量以客户端刷新后的市场页签徽标和上方实时统计徽标为准。
 <!-- catalog-stats:end -->
 
 ## 界面与演示
@@ -102,7 +128,7 @@ dsh plugin --profile web add dsh-mcp-connector
 | 连接诊断与最后成功缓存 |  |
 | ![连接诊断](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/07-connection-diagnostics.png) |  |
 
-`01`–`04` 保留 `v0.2.37` 的历史市场快照，`05`–`07` 与 43 秒演示来自 `v0.2.46` 当前无凭据 UI harness。桌面端一行 2 张卡片；只展示公开市场元数据、示例 Prompt 和明确标识的 Mock 工具说明，不包含凭据、本机路径或查询结果。详见 [`docs/screenshots/README.md`](docs/screenshots/README.md)。
+<!-- generated:media -->截图与 GIF 采集自 v0.2.92（2026-11-01）无凭据 Mock 页面，展示界面而非真实业务验收；市场数量是测试夹具。来源与更新方法见 [素材说明](docs/screenshots/README.md)。<!-- /generated:media -->
 
 ## 安装
 
@@ -143,6 +169,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/m
 - [按会话启用工具：显式激活、TTL 与 Host 安全边界](docs/SESSION-TOOL-INJECTION.md)
 - [工具试运行：官方 API 证据与安全设计](docs/TOOL-TRIAL-DESIGN.md)
 - [插件更新：版本检测、Provider 与回滚](docs/PLUGIN-UPDATE.md)
+- [国际化：`locale` 配置、词典约定与翻译完备性门禁](docs/I18N.md)
 - [市场注册：本地卡片、公共 Registry 与 OAuth 要求](docs/MARKET-REGISTRATION.md)
 - [第三方连接器上架指南](https://github.com/duhu2000/dsh-mcp-connector-registry/blob/main/docs/ONBOARDING.md)
 - [首次贡献：从 good first issue 到第一个 PR](docs/FIRST-CONTRIBUTION.md)
@@ -164,6 +191,7 @@ Bundle 默认配置位于 `cordis.patch.yml`：
     openBrowser: true
     showSidebarEntry: true
     compactManagementTools: false
+    locale: 'auto'
     frameAncestors: ['self']
 ```
 
@@ -182,6 +210,10 @@ Bundle 默认配置位于 `cordis.patch.yml`：
 - 此开关不减少已连接服务的业务工具数量，不停用连接、不迁移凭据、不修改作用域/治理规则。业务工具需要按需可见时，仍使用原有“按会话启用”。会话确认、TTL 与 Host 审批保持不变。
 - 例如发现入口可用 `{"action":"search","query":"天气","limit":5}`；查询连接状态可用 `{"action":"status"}`。详情使用 `action=detail` 和必填 `toolName`，市场搜索使用 `action=catalog` 与可选 `keyword`。
 - 设回 `false` 并重载插件可恢复旧管理工具名；不要同时运行两份插件。工具数量和 schema 大小的减少不等于实测 token 或费用节省。
+
+`locale` 选择面板与对话工具返回文案的语言，默认为 `'auto'`：跟随用户在 DSH「设置 → Language」里的选择（即 `@deepseek-ai/dsh-client-locale` 的 `preference`），读不到时再按 `LC_ALL` / `LC_MESSAGES` / `LANG`，仍无法识别时回退中文。界面语言属于用户偏好，插件不覆盖它：中文用户不做任何设置仍是中文（中文是 DSH 默认语言），在 DSH 里选了 English 的用户会直接得到英文。也可写成 `'zh-CN'` / `'en'` 强制指定。修改后需重载插件。
+
+连接器名称、厂商、分类、URL 与错误码不参与翻译，两种语言使用同一份目录。详见 [docs/I18N.md](docs/I18N.md)。
 
 `frameAncestors` 默认为 `['self']`，即面板页面（`/mcp-connector/ui/`）的 CSP 只允许同源页面内嵌，是既有行为，不做任何放宽。在桌面壳（Tauri/Electron）里把面板嵌进壳窗口时，祖先源与面板自身不同源，浏览器会以 `Framing '...' violates the following Content Security Policy directive: "frame-ancestors 'self'"` 拦截并导致面板白屏；此时需要由部署方/用户显式追加外壳源：
 
@@ -220,7 +252,7 @@ npm run dev:ui
 
 公共 Registry 每次合并后会生成 `catalog-stats.json`；本仓库的定时工作流每小时同步中英文介绍和统计快照。npm 页面中的静态正文随版本发布更新，上方动态统计徽标则直接读取 Registry，可在不发布新 npm 版本时保持实时数量一致。
 
-当前公开版本为 [`dsh-mcp-connector@0.2.76`](https://www.npmjs.com/package/dsh-mcp-connector)，对应 [GitHub Release v0.2.76](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.76)。
+<!-- generated:version -->当前公开版本为 [`dsh-mcp-connector@0.2.92`](https://www.npmjs.com/package/dsh-mcp-connector)，对应 [GitHub Release v0.2.92](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.92)。<!-- /generated:version -->
 
 版本能力与变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 Desktop 发版回归见 [docs/DESKTOP-E2E.md](docs/DESKTOP-E2E.md)。

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mountWebRoutes, isTrustedWebRequest, resolveUiFile, splitUiPath, buildCsp, normalizeFrameAncestors } from '../lib/web.js';
+import { mountWebRoutes, isTrustedWebRequest, resolveUiFile, splitUiPath, buildCsp, normalizeFrameAncestors, injectPanelLocale } from '../lib/web.js';
 import { StatusEventHub } from '../lib/status-events.js';
 
 /* ───────────────────────── fake http 对象 ───────────────────────── */
@@ -80,6 +80,26 @@ const api = {
 };
 
 /* ───────────────────────── 测试 ───────────────────────── */
+
+test('仅开放本机统计 API，已撤回社区统计 API 不可调用', async () => {
+  const wctx = makeWctx();
+  mountWebRoutes(wctx, { connectionStatistics: async () => ({ ok: true, detail: { scope: 'local-profile' } }) }, { logger: { warn() {} } });
+  const route = wctx.routes.get('/mcp-connector/api');
+  for (const method of ['connectionStatistics', 'communityStatistics', 'communityAggregate', 'setStatisticsParticipation']) {
+    const res = new FakeRes();
+    await route.handler(fakeReq({
+      method: 'POST', url: '/mcp-connector/api',
+      headers: { host: '127.0.0.1:62929', 'content-type': 'application/json' },
+      body: JSON.stringify({ method, params: {} }),
+    }), res);
+    if (method === 'connectionStatistics') {
+      assert.equal(res.status, 200);
+      assert.equal(JSON.parse(res.body).detail.scope, 'local-profile');
+    } else {
+      assert.equal(JSON.parse(res.body).ok, false);
+    }
+  }
+});
 
 test('fence：回环 + 同源放行', () => {
   assert.equal(isTrustedWebRequest({ headers: { host: '127.0.0.1:62929' } }), true);
@@ -421,4 +441,30 @@ test('Windows 路径：URL 始终按正斜杠分段且静态资源不误报 404'
   assert.equal(asset.ok, true);
   assert.equal(asset.rel, 'assets/qcc-logo.svg');
   assert.equal(resolveUiFile('\\..\\package.json').ok, false);
+});
+
+test('面板语言注入：中英文均注入安全常量、非法值不产生脚本载荷', () => {
+  const html = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"></head><body></body></html>';
+  const buffer = Buffer.from(html);
+
+  // Explicit Chinese must not be overridden by a stale English client URL.
+  for (const locale of ['zh-CN', 'zh', undefined, 'fr']) {
+    assert.ok(injectPanelLocale(buffer, locale).includes('window.__MCP_CONNECTOR_LOCALE__="zh-CN"'));
+  }
+
+  const injected = injectPanelLocale(buffer, 'en').toString('utf8');
+  assert.ok(injected.includes('<script>window.__MCP_CONNECTOR_LOCALE__="en"</script>'));
+  assert.ok(injected.indexOf('__MCP_CONNECTOR_LOCALE__') < injected.indexOf('</head>'), '注入必须在 head 内');
+  assert.ok(injected.includes('<body></body>'), '其余内容保持不变');
+  assert.equal(injectPanelLocale(buffer, 'en-US').toString('utf8').match(/"en"/) !== null, true, 'en-US 归一化为 en');
+
+  // 注入值只可能是归一化后的语言 id；任何注入载荷都归一化失败并回退中文（不注入）。
+  for (const evil of ['"><script>alert(1)</script>', 'en"</script><script>alert(1)', '</script>']) {
+    const result = injectPanelLocale(buffer, evil);
+    assert.equal(result.includes('alert(1)'), false, `不得注入载荷：${evil}`);
+  }
+
+  // 没有 </head> 时原样返回，面板回退到 <html lang>。
+  const headless = Buffer.from('<html><body>plain</body></html>');
+  assert.equal(injectPanelLocale(headless, 'en'), headless);
 });

@@ -10,6 +10,14 @@ OAuth availability depends on each provider's client-registration policy and acc
 
 [简体中文](README.md)
 
+**Bilingual interface:** Compact **中文 / EN** buttons share the top toolbar; full language names remain in tooltips and accessible labels. Your explicit choice is remembered in this browser. Host messages follow the explicit DSH language preference, defaulting to Chinese when unavailable; configure `locale: en` or `locale: zh-CN` to override. Switching reloads only the panel. Provider descriptions and user content retain their original language. See [language configuration](docs/I18N.md).
+
+### Homepage recommendations
+
+The homepage shows ten recommendations in a fixed order: Qichacha company data, Tencent Docs, Feishu, Notion, GitHub, Playwright, Wind stock data, Qichacha legal data, Amap, and Context7. All available recommended cards are expanded by default. This is a curated selection, not a usage ranking; provider authorization and configuration requirements still apply.
+
+![Homepage recommendations — English UI](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/08-ten-recommendations.jpg)
+
 ### Tool discovery and troubleshooting
 
 Search cached tools across enabled connections visible to the current workspace in the Tools tab. Filter by connection, service and latest discovery status, then open parameter details for types, required fields and nested structures. Without a selected workspace, only global connections appear.
@@ -30,7 +38,9 @@ Tool browsing does not execute target tools. Parameter summaries may omit comple
 [![Registry connectors](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fduhu2000%2Fdsh-mcp-connector-registry%2Fmain%2Fcatalog-stats.json&query=%24.registryCount&label=Registry%20connectors&color=5865f2)](https://github.com/duhu2000/dsh-mcp-connector-registry/blob/main/catalog-stats.json)
 [![Marketplace cards](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fduhu2000%2Fdsh-mcp-connector-registry%2Fmain%2Fcatalog-stats.json&query=%24.marketCount&label=Marketplace%20cards&color=16a34a)](https://github.com/duhu2000/dsh-mcp-connector-registry/blob/main/catalog-stats.json)
 
-## Start in 30 seconds
+## Get started
+
+Search for **`dsh-mcp-connector`** in your plugin marketplace, or run the command below. Default Desktop and Web installations both use the `web` profile; custom deployments should use the profile actually loaded by their host.
 
 ```bash
 dsh plugin --profile web add dsh-mcp-connector
@@ -38,11 +48,15 @@ dsh plugin --profile web add dsh-mcp-connector
 
 Fully restart DeepSeek Harness Desktop or `dsh web` after installation or upgrade, then open **MCP Connector** in the primary sidebar, or open it directly from **Settings → Plugins → Plugin Configuration → MCP Connector**.
 
+For Desktop, fully quit and relaunch the application. For Web, stop the existing `dsh web` process and start it again; refreshing the browser does not reload backend plugins.
+
+**Complete one task first:** [look up one company's profile](docs/tutorials/ONE-SUCCESS-CASE.md) (Chinese), checking authorization, tool source, and the actual result. For an independent review, use the [community sharing kit](docs/tutorials/SHARING-KIT.md) (Chinese): demo assets, an article outline, and a redacted evidence template.
+
 For a first successful use, confirm the connection and scope in Installed, find the expected tool and source in Tools, then complete one provider-permitted read-only call through the normal DSH Host approval flow. Cached visibility alone does not prove that a service is currently callable.
 
 First-success guide (Chinese): [install → connect → find a tool → make the first read-only call](docs/tutorials/README.md). Task details: [three acceptance-ready scenarios](docs/tutorials/FIRST-SUCCESS-SCENARIOS.md) · [migrate `mcpServers` JSON](docs/tutorials/JSON-MIGRATION.md) · [diagnose OAuth](docs/tutorials/OAUTH-DIAGNOSTICS.md) · [find and recover tools](docs/tutorials/TOOL-SEARCH-RECOVERY.md) · [trusted status copy](docs/tutorials/TRUSTED-STATUS-COPY.md).
 
-![43-second MCP Connector walkthrough](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/demo.gif)
+![MCP Connector walkthrough — English UI](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/demo.gif)
 
 If the plugin helps you connect an MCP server faster, consider [starring the repository](https://github.com/duhu2000/dsh-mcp-connector/stargazers), [submitting a connector](https://github.com/duhu2000/dsh-mcp-connector-registry/blob/main/docs/ONBOARDING.md), or [contributing a fix](CONTRIBUTING.md).
 
@@ -85,22 +99,22 @@ If the plugin helps you connect an MCP server faster, consider [starring the rep
 - Explicit, non-destructive migration from the two earlier Qichacha OAuth plugins, plus active-plugin conflict detection that blocks duplicate server management and credential overwrites.
 
 <!-- catalog-stats:start -->
-As of 2026-10-17, the public Registry publishes 110 connector descriptors. After merging and deduplicating them with the 4 bundled Qichacha cards, the Marketplace exposes 114 cards across 9 business categories. Recommendations remain limited to the four Qichacha cards, PKULaw, and Wind, for 6 featured cards in total. The Registry evolves independently; the badge shown after a client refresh and the live badges above are the authoritative current counts.
+As of 2026-10-24, the public Registry publishes 112 connector descriptors. After merging and deduplicating them with the 4 bundled Qichacha cards, the Marketplace exposes 116 cards across 9 business categories. Recommendations remain limited to the four Qichacha cards, PKULaw, and Wind, for 6 featured cards in total. The Registry evolves independently; the badge shown after a client refresh and the live badges above are the authoritative current counts.
 <!-- catalog-stats:end -->
 
 ## Interface and demo
 
 | Marketplace overview | Connector details and curated prompts |
 |---|---|
-| ![Marketplace overview](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/01-market-overview.jpg) | ![Connector details](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/02-connector-detail.jpg) |
+| ![Marketplace overview](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/01-market-overview.jpg) | ![Connector details](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/02-connector-detail.jpg) |
 | Tool discovery, descriptions, and scrolling | JSON import |
-| ![Tool discovery](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/03-tool-discovery.jpg) | ![JSON import](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/04-json-import.jpg) |
+| ![Tool discovery](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/03-tool-discovery.jpg) | ![JSON import](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/04-json-import.jpg) |
 | Unified tool search and sources | Parameter details and safe schema |
-| ![Unified tool search](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/05-unified-tool-search.png) | ![Tool parameter details](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/06-tool-parameters.png) |
+| ![Unified tool search](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/05-unified-tool-search.png) | ![Tool parameter details](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/06-tool-parameters.png) |
 | Connection diagnostics and last-success cache |  |
-| ![Connection diagnostics](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/07-connection-diagnostics.png) |  |
+| ![Connection diagnostics](https://raw.githubusercontent.com/duhu2000/dsh-mcp-connector/main/docs/screenshots/en/07-connection-diagnostics.png) |  |
 
-Assets `01`–`04` preserve the historical `v0.2.37` marketplace snapshot. Assets `05`–`07` and the 43-second walkthrough come from the current `v0.2.46` credential-free UI harness. The harness mirrors the real 800px product panel, producing two cards per desktop row. It shows only public marketplace metadata, example prompts, and explicitly marked mock tool descriptions—never credentials, local paths, or query results. See [`docs/screenshots/README.md`](docs/screenshots/README.md) for provenance.
+<!-- generated:media -->English UI screenshots and GIF were captured from v0.2.92 (2026-11-01), using the credential-free Mock harness. Provider content retains its original language. They demonstrate UI, not real business acceptance; counts are fixtures. See [asset provenance](docs/screenshots/README.md).<!-- /generated:media -->
 
 ## Installation
 
@@ -140,6 +154,7 @@ The detailed [Chinese user guide](docs/USER-GUIDE.md) covers category browsing, 
 - [Per-session tool activation, TTL, and Host safety boundary](docs/SESSION-TOOL-INJECTION.md)
 - [Tool trial: official API evidence and safety design](docs/TOOL-TRIAL-DESIGN.md)
 - [Plugin updates: version discovery, providers, and rollback](docs/PLUGIN-UPDATE.md)
+- [Localization: `locale`, dictionary conventions, and the translation completeness gate](docs/I18N.md)
 - [Marketplace registration: local cards, the public Registry, and OAuth requirements](docs/MARKET-REGISTRATION.md)
 - [Third-party connector onboarding](https://github.com/duhu2000/dsh-mcp-connector-registry/blob/main/docs/ONBOARDING.md)
 - [First contribution: from a good first issue to your first PR](docs/FIRST-CONTRIBUTION.md)
@@ -168,6 +183,7 @@ The default bundle configuration is in `cordis.patch.yml`:
     openBrowser: true
     showSidebarEntry: true
     compactManagementTools: false
+    locale: 'auto'
     frameAncestors: ['self']
 ```
 
@@ -187,6 +203,10 @@ The proxy variables must be present in the running DSH process. After changing t
 Use the connector UI for connection setup, authorization, import, editing, snapshots and migration. There is no arbitrary execution proxy or automatic management-tool loading. Keep this option `false` for conversation-only deployments or workflows that depend on legacy tool names. Set it back to `false` and reload to restore those names; do not run duplicate plugin instances.
 
 This setting does not hide downstream business tools, disable connections, migrate credentials, change workspace/governance rules or bypass Host approval. Use the existing session injection mode for downstream tool visibility. Reduced tool count/schema size is not a measured token or cost saving.
+
+`locale` selects the language of the panel and of the text returned by the conversation tools. It defaults to `'auto'`, which follows the language you picked in DSH under Settings → Language (the `preference` of `@deepseek-ai/dsh-client-locale`), then `LC_ALL` / `LC_MESSAGES` / `LANG`, and falls back to Chinese when nothing matches. The interface language is the user's own preference, so the plugin does not override it: a Chinese user who changes nothing still gets Chinese (the DSH default), and a user who selected English in DSH gets English. Set it to `'zh-CN'` or `'en'` to force one language. Reload the plugin after changing it.
+
+Connector names, vendors, categories, URLs and error codes are never translated, so the same catalog renders in both languages. See [docs/I18N.md](docs/I18N.md).
 
 `frameAncestors` defaults to `['self']`: the CSP of the panel page (`/mcp-connector/ui/`) only allows same-origin embedding, which is the existing behaviour and is not relaxed by default. When a desktop shell (Tauri/Electron) embeds the panel, the ancestor origin differs from the panel origin, so the browser blocks it with `Framing '...' violates the following Content Security Policy directive: "frame-ancestors 'self'"` and the panel renders blank. Deployers must opt in explicitly:
 
@@ -225,7 +245,7 @@ npm run dev:ui
 
 Every Registry merge regenerates `catalog-stats.json`; an hourly workflow in this repository synchronizes the Chinese and English product copy plus a local stats snapshot. The static npm README updates with package releases, while the live badges above read the Registry directly and therefore stay current without another npm release.
 
-The current public version is [`dsh-mcp-connector@0.2.76`](https://www.npmjs.com/package/dsh-mcp-connector), with [GitHub Release v0.2.76](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.76).
+<!-- generated:version -->The current public version is [`dsh-mcp-connector@0.2.92`](https://www.npmjs.com/package/dsh-mcp-connector), with [GitHub Release v0.2.92](https://github.com/duhu2000/dsh-mcp-connector/releases/tag/v0.2.92).<!-- /generated:version -->
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and [docs/DESKTOP-E2E.md](docs/DESKTOP-E2E.md) for the Desktop release checklist.
 

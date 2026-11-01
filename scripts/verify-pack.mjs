@@ -17,15 +17,23 @@ const WHITELIST = [
   /^catalog\/[^/]+\.json$/,
   /^lib\/[^/]+\.js$/,
   /^lib\/connectors\/[^/]+\.js$/,
+  // i18n 运行时与语言词典：随插件一起发布，英文界面依赖它们。
+  /^lib\/i18n\/[^/]+\.js$/,
+  /^lib\/i18n\/locales\/[^/]+\.js$/,
+  /^lib\/i18n\/locales\/en\/[^/]+\.js$/,
   /^scripts\/(?:probe-connector|build-registry|cli-bridge|ui-harness)\.mjs$/,
   /^registry\/README\.md$/,
   /^registry\/catalog\.json$/,
   /^registry\/connectors\/[^/]+\.json$/,
   /^registry\/schema\/[^/]+\.json$/,
-  /^docs\/(?:CLI-PROVIDERS|CONFIG-BACKUP|CONNECTION-SCOPES|DESKTOP-E2E|FIRST-CONTRIBUTION|MARKET-REGISTRATION|PLUGIN-UPDATE|SESSION-TOOL-INJECTION|STDIO-SUPPORT|TOOL-GOVERNANCE|USER-GUIDE)\.md$/,
-  /^docs\/tutorials\/(?:README|FIRST-SUCCESS-SCENARIOS|JSON-MIGRATION|OAUTH-DIAGNOSTICS|TOOL-SEARCH-RECOVERY|TRUSTED-STATUS-COPY)\.md$/,
+  /^docs\/(?:CLI-PROVIDERS|CONFIG-BACKUP|CONNECTION-SCOPES|DATA-MCP-CONTRIBUTION-REVIEW|DESKTOP-E2E|FIRST-CONTRIBUTION|I18N|MARKET-REGISTRATION|PLUGIN-UPDATE|SESSION-TOOL-INJECTION|SHAREABLE-CONNECTION-TEMPLATES|STDIO-SUPPORT|TOOL-GOVERNANCE|USER-GUIDE)\.md$/,
+  /^docs\/tutorials\/(?:README|FIRST-SUCCESS-SCENARIOS|ONE-SUCCESS-CASE|SHARING-KIT|SHARING-AUTHOR-ASSETS|SHARING-UI-INTEGRATION|JSON-MIGRATION|OAUTH-DIAGNOSTICS|TOOL-SEARCH-RECOVERY|TRUSTED-STATUS-COPY)\.md$/,
   /^docs\/screenshots\/(?:README\.md|assets\.json|[^/]+\.(?:gif|jpe?g|png|svg|webp))$/,
+  /^docs\/screenshots\/en\/(?:assets\.json|[^/]+\.(?:gif|jpe?g|png|svg|webp))$/,
   /^ui\/index\.html$/,
+  /^ui\/sharing-experience\.js$/,
+  /^ui\/locale\.js$/,
+  /^ui\/connection-template-sharing\.js$/,
   /^ui\/assets\/[^/]+\.(?:svg|png|webp)$/,
 ];
 
@@ -47,7 +55,15 @@ try {
   process.exit(1);
 }
 
-const [pack] = JSON.parse(raw);
+// npm 11 及更早返回数组 `[{ files }]`；npm 12 改为按包名索引的对象
+// `{ "pkg": { files } }`。两种形状都接受，避免发布门禁因 npm 大版本升级而失效。
+function firstPackEntry(parsed) {
+  if (Array.isArray(parsed)) return parsed[0];
+  if (parsed && typeof parsed === 'object') return Object.values(parsed)[0];
+  return undefined;
+}
+
+const pack = firstPackEntry(JSON.parse(raw));
 if (!pack || !Array.isArray(pack.files)) {
   console.error('verify-pack 失败：无法解析 npm pack 输出');
   process.exit(1);
@@ -56,6 +72,10 @@ if (!pack || !Array.isArray(pack.files)) {
 const files = pack.files.map((file) => file.path).sort();
 const requiredTutorials = [
   'docs/tutorials/README.md',
+  'docs/tutorials/ONE-SUCCESS-CASE.md',
+  'docs/tutorials/SHARING-KIT.md',
+  'docs/tutorials/SHARING-AUTHOR-ASSETS.md',
+  'docs/tutorials/SHARING-UI-INTEGRATION.md',
   'docs/tutorials/FIRST-SUCCESS-SCENARIOS.md',
   'docs/tutorials/JSON-MIGRATION.md',
   'docs/tutorials/OAUTH-DIAGNOSTICS.md',
