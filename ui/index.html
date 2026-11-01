@@ -1112,6 +1112,12 @@
       "撤销最近变更": "Undo the last change",
       "explorerConnection": "Connection",
       "explorerServer": "Server",
+      "如目标是可信的局域网私有 IP，请勾选明文 HTTP 风险确认；请勿对公网或不可信服务开启。": "If the target is a trusted private LAN IP, check the plaintext HTTP risk confirmation box; do not enable this for public or untrusted services.",
+      "公网地址必须使用 HTTPS；HTTP 只允许回环地址，或经显式确认的私有 IP 字面量。": "Public addresses must use HTTPS; HTTP is only allowed for loopback addresses or explicitly confirmed private IP literals.",
+      "请检查引号、逗号，并确认顶层是 mcpServers 或 connections。": "Please check quotes and commas, and confirm the top level is mcpServers or connections.",
+      "请核对鉴权方式、Token/API Key 是否有效以及 Header 名。": "Please check the auth mode, whether the Token/API Key is valid, and the header name.",
+      "请检查网络、端点是否可达以及 MCP URL 是否完整。": "Please check the network, whether the endpoint is reachable, and whether the MCP URL is complete.",
+      "使用 qcc-company 的 get_company_profile，只查询“企查查科技股份有限公司”的企业简介（searchKey 为完整企业名称）。先核对当前工具来源、参数、账号权限及费用；不明确时停止并询问我。遵守 Host 审批，不绕过权限。仅调用一次；不要查询联系人、司法、财务或其他主体，不要写入任何数据。成功后列出实际返回的企业名称、简介摘要、数据来源和调用时间；缺失字段标为未返回。失败则报告错误，不自动扩大查询或连续重试。": "Use `get_company_profile` from qcc-company to look up only the company profile of “Qichacha Technology Co., Ltd.” (searchKey is the full company name). First verify the current tool source, parameters, account permissions, and cost; stop and ask me if anything is unclear. Respect Host approval and do not bypass permissions. Call it once only; do not query contacts, litigation, financials, or any other entity, and do not write any data. On success, list the returned company name, profile summary, data source, and call time; mark missing fields as not returned. On failure, report the error and do not widen the query or retry repeatedly.",
   };
   // ── 国际化（i18n） ───────────────────────────────────────────────────────
   // 约定与 lib/i18n/index.js 完全一致：**msgid 就是中文原文**（gettext 风格）。
@@ -1448,7 +1454,7 @@
   }
 
   async function openSharingExperience() {
-    openModal(t('整理使用体验 · 仅本地草稿'), `<p class="field-help">${t("请勿填写业务原文、账号或凭据。关闭面板会清除未带出的编辑内容。分享完全自愿，不会自动发布。")}</p><div id="sharing-root" role="region" aria-label="${t("使用体验编辑器")}">${t("正在加载…")}</div><div class="m-actions"><button class="btn ghost" type="button" onclick="window.__mcp.closeModal()">关闭</button></div>`);
+    openModal(t('整理使用体验 · 仅本地草稿'), `<p class="field-help">${t("请勿填写业务原文、账号或凭据。关闭面板会清除未带出的编辑内容。分享完全自愿，不会自动发布。")}</p><div id="sharing-root" role="region" aria-label="${t("使用体验编辑器")}">${t("正在加载…")}</div><div class="m-actions"><button class="btn ghost" type="button" onclick="window.__mcp.closeModal()">${t('关闭')}</button></div>`);
     const sequence = sharingSequence;
     const root = $('#sharing-root');
     try {
@@ -1461,7 +1467,7 @@
   }
 
   async function openSafeTemplate() {
-    openModal(t('安全连接模板 · 预览后自行分享'), `<p class="field-help">${t("仅生成公开目录引用或全重填的 HTTP 模板，不读取真实连接。复制与下载仅在你点击后执行，不会自动导入或连接。")}</p><div id="safe-template-root" role="region" aria-label="${t("安全模板编辑器")}">${t("正在读取随包公开目录…")}</div><div class="m-actions"><button class="btn ghost" type="button" onclick="window.__mcp.closeModal()">关闭</button></div>`);
+    openModal(t('安全连接模板 · 预览后自行分享'), `<p class="field-help">${t("仅生成公开目录引用或全重填的 HTTP 模板，不读取真实连接。复制与下载仅在你点击后执行，不会自动导入或连接。")}</p><div id="safe-template-root" role="region" aria-label="${t("安全模板编辑器")}">${t("正在读取随包公开目录…")}</div><div class="m-actions"><button class="btn ghost" type="button" onclick="window.__mcp.closeModal()">${t('关闭')}</button></div>`);
     const sequence = sharingSequence;
     const root = $('#safe-template-root');
     try {
@@ -1493,7 +1499,7 @@
         <li><strong>${t("业务调用：")}</strong>${t("在 DSH 中自行发送并按 Host 审批，只有真实返回与目标一致才算成功。本面板不自动判成功。")}</li>
       </ol>
       <p id="first-use-result" class="field-help" role="status" aria-live="polite">${t("正在读取当前范围…")}</p>
-      <details><summary>${t("查看只读任务示例")}</summary><pre class="tool-schema">${esc(FIRST_USE_PROMPT)}</pre></details>
+      <details><summary>${t("查看只读任务示例")}</summary><pre class="tool-schema">${esc(t(FIRST_USE_PROMPT))}</pre></details>
       <p class="field-help">${t("示例：一次企业简介查询。插件开源不代表服务商免费；只读也可能收费。无需上传业务数据或完整日志。")}</p>
       <label class="field-help"><input id="first-use-consent" type="checkbox" disabled /> ${t("我会核对账号权限、费用及参数；带入草稿后由我自行发送，保留 Host 审批。")}</label>
       <div class="m-actions">
@@ -1503,7 +1509,7 @@
         <button class="btn ghost" id="first-use-sharing" type="button">${t("整理使用体验")}</button>
         <button class="btn ghost" id="first-use-template" type="button">${t("生成安全连接模板")}</button>
         <button class="btn" id="first-use-launch" type="button" disabled>${t("带入 DSH 会话草稿")}</button>
-        <button class="btn ghost" type="button" onclick="window.__mcp.closeModal()">关闭</button>
+        <button class="btn ghost" type="button" onclick="window.__mcp.closeModal()">${t('关闭')}</button>
       </div>`);
     $('#first-use-market').onclick = () => firstUseNavigate('market');
     $('#first-use-tools').onclick = () => firstUseNavigate('tools');
@@ -3496,6 +3502,7 @@
     setAttr('#detail-close', 'aria-label', '关闭详情');
     setAttr('#detail-close', 'title', '关闭详情');
     setAttr('#connection-policy', 'aria-label', '连接策略');
+    setAttr('#tools-search', 'placeholder', '搜索工具名称或描述…');
   }
 
   applyStaticLocale();

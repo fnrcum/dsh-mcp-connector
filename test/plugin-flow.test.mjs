@@ -152,8 +152,8 @@ test('精简工具配置保持旧默认；开启后仅两个入口且图形 API 
   const { ctx, tools, webCall, disposers } = makePluginContext({ withWeb: true });
   try {
     await apply(ctx, baseConfig({ compactManagementTools: true }));
-    assert.deepEqual([...tools.defs.keys()], ['mcp_connector_discover', 'mcp_connector_session_tools']);
-    const status = await tools.defs.get('mcp_connector_discover').execute({ action: 'status' });
+    assert.deepEqual([...tools.defs.keys()], ['connector_discover', 'connector_session_tools']);
+    const status = await tools.defs.get('connector_discover').execute({ action: 'status' });
     assert.equal(status.ok, true);
     assert.equal((await webCall('status')).ok, true);
     const invalid = await webCall('configure', {});
@@ -208,7 +208,7 @@ test('市场 stdio 本地覆盖：重连、快照恢复、停用保持及失败�
     assert.equal((await webCall('applyLocalOverrides', { key, reset: true })).ok, true);
     assert.equal((await record()).localOverrides, undefined);
     assert.deepEqual(entry().options.config.args, ['server.js']);
-    assert.equal([...tools.defs.keys()].filter((name) => name.startsWith('mcp_connector_')).length, 25, 'no additional resident management tool');
+    assert.equal([...tools.defs.keys()].filter((name) => name.startsWith('connector_')).length, 25, 'no additional resident management tool');
   } finally { for (const dispose of disposers) await dispose(); }
 });
 
@@ -476,7 +476,7 @@ test('configure 无顶层 anyOf 时仍拒绝缺失参数且不创建连接、快
       [{ name: 'Missing command', transport: 'stdio' }, /command 必填/],
       [{ connectorId: 'nonexistent-issue-89' }, /不存在/],
     ]) {
-      const result = await tools.defs.get('mcp_connector_configure').execute(args);
+      const result = await tools.defs.get('connector_configure').execute(args);
       assert.equal(result.ok, false);
       assert.match(result.message, message);
       assert.equal(loader.entries.size, 0);
@@ -511,7 +511,7 @@ test('后台发现覆盖手动、JSON、目录连接，缓存隔离且断网恢�
   const { tools, tables, disposers } = plugin;
   const { apply } = await import('../lib/index.js');
   const connectors = [{ id: 'discovery-demo', name: 'Demo', auth: { mode: 'none' }, servers: [{ serverKey: 'one', serverName: 'catalog-demo', url }] }];
-  const execute = (name, input) => tools.defs.get(`mcp_connector_${name}`).execute(input, { signal: new AbortController().signal });
+  const execute = (name, input) => tools.defs.get(`connector_${name}`).execute(input, { signal: new AbortController().signal });
   try {
     await apply(plugin.ctx, baseConfig({ connectors }));
     assert.equal((await execute('configure', { name: 'Manual', serverName: 'manual-demo', url, scope: 'project', workspaceId: 'workspace-1' })).ok, true);
@@ -577,7 +577,7 @@ test('同名工具参数增删改经真实 HTTP 发现更新缓存，失败不�
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const plugin = makePluginContext();
-  const execute = (name, input) => plugin.tools.defs.get(`mcp_connector_${name}`).execute(input, { signal: new AbortController().signal });
+  const execute = (name, input) => plugin.tools.defs.get(`connector_${name}`).execute(input, { signal: new AbortController().signal });
   try {
     const { apply } = await import('../lib/index.js');
     await apply(plugin.ctx, baseConfig());
@@ -637,7 +637,7 @@ test('工具浏览 API：分页与筛选、无 Workspace 仅全局、只读搜�
   try {
     await apply(ctx, baseConfig());
     for (const name of ['a', 'b', 'c']) {
-      const configured = await tools.defs.get('mcp_connector_configure').execute({ name, serverName: name, url: `${url}/${name}`,
+      const configured = await tools.defs.get('connector_configure').execute({ name, serverName: name, url: `${url}/${name}`,
         ...(name === 'a' ? { scope: 'project', workspaceId: 'workspace-1' } : {}) });
       assert.equal(configured.ok, true, configured.message);
     }
@@ -660,7 +660,7 @@ test('工具浏览 API：分页与筛选、无 Workspace 仅全局、只读搜�
     assert.equal(check.ok, true, check.message);
     assert.ok(requests.slice(before).every((request) => request.path === '/c'));
     limited = true;
-    const failed = await tools.defs.get('mcp_connector_tools_list').execute({ connectorId: '__custom__', connectionKey: 'custom-b' });
+    const failed = await tools.defs.get('connector_tools_list').execute({ connectorId: '__custom__', connectionKey: 'custom-b' });
     assert.equal(failed.ok, false);
     const status = await webCall('toolExplorer', { connectionKey: 'custom-b' });
     assert.equal(status.detail.selectedConnections[0].status, 'failed');
@@ -680,16 +680,16 @@ test('自定义 stdio 在 Host 注册工具后自动入缓存，停用即不可�
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig());
-    const configured = await tools.defs.get('mcp_connector_configure').execute({ name: 'Local', serverName: 'local-discovery', transport: 'stdio', command: 'node', args: ['server.js'] });
+    const configured = await tools.defs.get('connector_configure').execute({ name: 'Local', serverName: 'local-discovery', transport: 'stdio', command: 'node', args: ['server.js'] });
     assert.equal(configured.ok, true, configured.message);
     tools.register({ name: 'mcp__local-discovery__lookup', description: 'Lookup', parameters: { type: 'object', properties: { const: { type: 'string' } } } });
     await waitFor(() => [...tables.get('tool_catalog').entries()].length === 1);
-    const result = await tools.defs.get('mcp_connector_tool_search').execute({ query: 'lookup', connectionKey: configured.detail.key });
+    const result = await tools.defs.get('connector_tool_search').execute({ query: 'lookup', connectionKey: configured.detail.key });
     assert.equal(result.detail.items.length, 1);
-    const toggle = tools.defs.get('mcp_connector_set_enabled');
+    const toggle = tools.defs.get('connector_set_enabled');
     assert.ok(toggle);
     assert.equal((await toggle.execute({ key: configured.detail.key, enabled: false })).ok, true);
-    assert.equal((await tools.defs.get('mcp_connector_tool_search').execute({ query: 'lookup', connectionKey: configured.detail.key })).detail.items.length, 0);
+    assert.equal((await tools.defs.get('connector_tool_search').execute({ query: 'lookup', connectionKey: configured.detail.key })).detail.items.length, 0);
   } finally { disposers.forEach((dispose) => dispose()); }
 });
 
@@ -713,14 +713,14 @@ test('后台 tools/list 晚于断开返回时不复活已删除缓存', { timeou
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig());
-    const configured = await tools.defs.get('mcp_connector_configure').execute({ name: 'Race', url: `http://127.0.0.1:${server.address().port}/mcp` });
+    const configured = await tools.defs.get('connector_configure').execute({ name: 'Race', url: `http://127.0.0.1:${server.address().port}/mcp` });
     assert.equal(configured.ok, true);
     await waitFor(() => started);
-    assert.equal((await tools.defs.get('mcp_connector_disconnect').execute({ key: configured.detail.key }, { signal: new AbortController().signal })).ok, true);
+    assert.equal((await tools.defs.get('connector_disconnect').execute({ key: configured.detail.key }, { signal: new AbortController().signal })).ok, true);
     release();
     await new Promise((resolve) => setTimeout(resolve, 150));
     assert.equal([...tables.get('tool_catalog').entries()].length, 0);
-    assert.equal((await tools.defs.get('mcp_connector_tool_search').execute({ query: 'old_tool' })).detail.items.length, 0);
+    assert.equal((await tools.defs.get('connector_tool_search').execute({ query: 'old_tool' })).detail.items.length, 0);
   } finally {
     release(); disposers.forEach((dispose) => dispose());
     await new Promise((resolve) => server.close(resolve));
@@ -767,7 +767,7 @@ test('OAuth 一键连接：授权 → 挂载 mcp-client 条目 → 状态', { ti
   };
 
   await apply(ctx, baseConfig({ connectors: [connector] }));
-  const connectTool = tools.defs.get('mcp_connector_connect');
+  const connectTool = tools.defs.get('connector_connect');
   assert.ok(connectTool, 'connect tool registered');
 
   const promise = connectTool.execute({
@@ -785,7 +785,7 @@ test('OAuth 一键连接：授权 → 挂载 mcp-client 条目 → 状态', { ti
   assert.match(e1.options.config.headers.Authorization, /^Bearer /);
   assert.equal(e1.options.config.serverName, 'acme-company');
 
-  const status = await tools.defs.get('mcp_connector_status').execute({});
+  const status = await tools.defs.get('connector_status').execute({});
   assert.equal(status.ok, true);
   assert.equal(status.detail.items.length, 2);
   assert.equal(status.detail.items[0].authMode, 'oauth');
@@ -793,11 +793,11 @@ test('OAuth 一键连接：授权 → 挂载 mcp-client 条目 → 状态', { ti
 
   const reauthorized = await connectTool.execute({ connectorId: 'acme' }, { signal: undefined });
   assert.equal(reauthorized.ok, true, reauthorized.message);
-  const statusAfterReauthorize = await tools.defs.get('mcp_connector_status').execute({ workspaceId: 'workspace-1' });
+  const statusAfterReauthorize = await tools.defs.get('connector_status').execute({ workspaceId: 'workspace-1' });
   assert.ok(statusAfterReauthorize.detail.items.every((item) => item.scope.binding.global === false));
   assert.ok(statusAfterReauthorize.detail.items.every((item) => item.scope.binding.projects[0] === 'workspace-1'), '旧客户端重新授权不得把 project 范围静默提升为 global');
 
-  const snapshotTool = tools.defs.get('mcp_connector_snapshot');
+  const snapshotTool = tools.defs.get('connector_snapshot');
   const preview = await snapshotTool.execute({ action: 'preview', snapshotId: result.detail.snapshotId });
   assert.equal(preview.ok, true);
   assert.equal(preview.detail.oauthRemovalCount, 2);
@@ -832,7 +832,7 @@ test('HTTP OAuth 用 oauthResource 解耦查询参数：authorizedResources 保�
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const pending = tools.defs.get('mcp_connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
+    const pending = tools.defs.get('connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
     await autoApprove(logs);
     const connected = await pending;
     assert.equal(connected.ok, true, connected.message);
@@ -870,7 +870,7 @@ test('未声明 oauthResource 时带查询串的 OAuth Server 会把查询串写
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const pending = tools.defs.get('mcp_connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
+    const pending = tools.defs.get('connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
     await autoApprove(logs);
     const connected = await pending;
     assert.equal(connected.ok, true, connected.message);
@@ -908,7 +908,7 @@ test('OAuth 一键授权同时挂载远程 HTTP 与本地 stdio，Token 仅在�
       enabled: true, createdAt: now, updatedAt: now,
     });
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const promise = tools.defs.get('mcp_connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
+    const promise = tools.defs.get('connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
     await autoApprove(logs);
     const result = await promise;
     assert.equal(result.ok, true, result.message);
@@ -927,8 +927,8 @@ test('OAuth 一键授权同时挂载远程 HTTP 与本地 stdio，Token 仅在�
     assert.equal(persistedLocal.oauthTokenEnv, 'DOCUMENT_AUTHORIZATION');
     assert.deepEqual(persistedLocal.auth, { mode: 'oauth', grantKey: result.detail.grantKey });
     assert.deepEqual(persistedRemote.auth, { mode: 'oauth', grantKey: result.detail.grantKey });
-    const catalog = await tools.defs.get('mcp_connector_catalog').execute({ keyword: connector.id });
-    const status = await tools.defs.get('mcp_connector_status').execute({});
+    const catalog = await tools.defs.get('connector_catalog').execute({ keyword: connector.id });
+    const status = await tools.defs.get('connector_status').execute({});
     const runtimeToken = remote.headers.Authorization.slice(7);
     assert.doesNotMatch(JSON.stringify({ result, persistedLocal, persistedRemote, catalog, status, logs }), new RegExp(runtimeToken));
     assert.doesNotMatch(JSON.stringify({ result, persistedLocal, persistedRemote, catalog, status, logs }), /legacy-api-key/);
@@ -957,7 +957,7 @@ test('OAuth DCR 403 明确识别客户端准入阶段，不误导用户重试浏
 
   try {
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const result = await tools.defs.get('mcp_connector_connect').execute(
+    const result = await tools.defs.get('connector_connect').execute(
       { connectorId: connector.id },
       { signal: undefined },
     );
@@ -1005,7 +1005,7 @@ test('OAuth DCR client_secret_post/basic：换取、刷新和撤销均使用动�
 
     try {
       await apply(ctx, baseConfig({ connectors: [connector] }));
-      const pending = tools.defs.get('mcp_connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
+      const pending = tools.defs.get('connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
       await autoApprove(logs);
       const connected = await pending;
       assert.equal(connected.ok, true, connected.message);
@@ -1015,8 +1015,8 @@ test('OAuth DCR client_secret_post/basic：换取、刷新和撤销均使用动�
       assert.equal(grants[0][1].clientSecret, oauth.state.clientSecret);
       assert.equal(grants[0][1].tokenEndpointAuthMethod, tokenEndpointAuthMethod);
 
-      const catalog = await tools.defs.get('mcp_connector_catalog').execute({ keyword: connector.id });
-      const status = await tools.defs.get('mcp_connector_status').execute({});
+      const catalog = await tools.defs.get('connector_catalog').execute({ keyword: connector.id });
+      const status = await tools.defs.get('connector_status').execute({});
       const publicOutput = JSON.stringify({ connected, catalog, status, logs });
       assert.doesNotMatch(publicOutput, new RegExp(oauth.state.clientSecret));
 
@@ -1034,7 +1034,7 @@ test('OAuth DCR client_secret_post/basic：换取、刷新和撤销均使用动�
       assert.ok(refreshed.accessToken.length > 0);
       assert.equal(oauth.state.refreshCount, 1);
 
-      const disconnected = await tools.defs.get('mcp_connector_disconnect').execute({ key: `${connector.id}-company` }, { signal: undefined });
+      const disconnected = await tools.defs.get('connector_disconnect').execute({ key: `${connector.id}-company` }, { signal: undefined });
       assert.equal(disconnected.ok, true, disconnected.message);
       assert.ok(oauth.state.clientAuthMethods.length >= 3, '应至少覆盖 code exchange、refresh、revoke');
       assert.ok(oauth.state.clientAuthMethods.every((method) => method === tokenEndpointAuthMethod));
@@ -1058,7 +1058,7 @@ test('同一连接器并发点击 OAuth 连接时只发起一次授权', { timeo
 
   try {
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const connect = tools.defs.get('mcp_connector_connect');
+    const connect = tools.defs.get('connector_connect');
     const first = connect.execute({ connectorId: connector.id }, { signal: undefined });
     const second = connect.execute({ connectorId: connector.id }, { signal: undefined });
     await autoApproveAt(logs, 0);
@@ -1098,7 +1098,7 @@ test('grantSharing=issuer：第二张同 issuer 卡片复用首张授权，不�
 
   try {
     await apply(ctx, baseConfig({ connectors }));
-    const connect = tools.defs.get('mcp_connector_connect');
+    const connect = tools.defs.get('connector_connect');
     const first = connect.execute({ connectorId: 'shared-company' }, { signal: undefined });
     await autoApproveAt(logs, 0);
     const firstResult = await first;
@@ -1136,7 +1136,7 @@ test('grantSharing=issuer：不同卡片并发连接也只发起一次授权', {
   ];
   try {
     await apply(ctx, baseConfig({ connectors }));
-    const connect = tools.defs.get('mcp_connector_connect');
+    const connect = tools.defs.get('connector_connect');
     const first = connect.execute({ connectorId: 'concurrent-company' }, { signal: undefined });
     const second = connect.execute({ connectorId: 'concurrent-risk' }, { signal: undefined });
     await autoApproveAt(logs, 0);
@@ -1186,7 +1186,7 @@ test('升级启动时把历史同 issuer 多 Grant 归并为最新共享授权',
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig({ connectors }));
 
-  const status = await tools.defs.get('mcp_connector_status').execute({});
+  const status = await tools.defs.get('connector_status').execute({});
   assert.deepEqual([...new Set(status.detail.items.map((item) => item.grant.grantKey))], [newKey]);
   assert.equal([...tables.get('grants').entries()].length, 1);
   assert.deepEqual((await tables.get('grants').get(newKey)).connectorIds.sort(), ['upgrade-company', 'upgrade-risk']);
@@ -1231,7 +1231,7 @@ test('历史最新 Grant 已失效时先验证并选择仍可刷新的共享授�
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig({ connectors }));
-    const status = await tools.defs.get('mcp_connector_status').execute({});
+    const status = await tools.defs.get('connector_status').execute({});
     assert.deepEqual([...new Set(status.detail.items.map((item) => item.grant.grantKey))], [validKey]);
     assert.equal([...tables.get('grants').entries()].length, 1);
     assert.equal(oauth.state.refreshAttempts, 2, '应先拒绝新的失效 Grant，再刷新较旧的有效 Grant');
@@ -1282,7 +1282,7 @@ test('并发进程轮换 refresh token 后重读持久化 Grant，避免误判�
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const status = await tools.defs.get('mcp_connector_status').execute({});
+    const status = await tools.defs.get('connector_status').execute({});
     assert.equal(status.detail.items[0].grant.needsReauth, false);
     assert.ok(loader.entries.has('mcp-refresh-rotation-company'));
     assert.equal(oauth.state.refreshCount, 1);
@@ -1336,7 +1336,7 @@ test('两个 DSH Host 同时刷新时只轮换一次 Refresh Token', { timeout: 
 
     assert.equal(oauth.state.refreshCount, 1, '一次性 Refresh Token 只能被一个 Host 消耗');
     for (const host of [hostA, hostB]) {
-      const status = await host.tools.defs.get('mcp_connector_status').execute({});
+      const status = await host.tools.defs.get('connector_status').execute({});
       assert.equal(status.detail.items[0].grant.needsReauth, false);
       assert.ok(host.loader.entries.has('mcp-cross-process-company'));
     }
@@ -1362,7 +1362,7 @@ test('grantSharing=issuer 不跨 MCP 资源域复用 Bearer Token', { timeout: 3
   ];
   try {
     await apply(ctx, baseConfig({ connectors }));
-    const connect = tools.defs.get('mcp_connector_connect');
+    const connect = tools.defs.get('connector_connect');
     const first = connect.execute({ connectorId: 'origin-first' }, { signal: undefined });
     await autoApproveAt(logs, 0);
     assert.equal((await first).ok, true);
@@ -1395,7 +1395,7 @@ test('重新 OAuth 授权成功后撤销并删除已不再引用的旧 grant', {
 
   try {
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const connect = tools.defs.get('mcp_connector_connect');
+    const connect = tools.defs.get('connector_connect');
 
     const first = connect.execute({ connectorId: connector.id }, { signal: undefined });
     await autoApproveAt(logs, 0);
@@ -1489,7 +1489,7 @@ test('启动刷新遇到暂时性 OAuth 故障时记录原因、自动重试且�
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig({ connectors: [connector], refreshRetryBaseMs: 1_000, refreshRetryMaxMs: 1_000 }));
-    const statusDuringRetry = await tools.defs.get('mcp_connector_status').execute({});
+    const statusDuringRetry = await tools.defs.get('connector_status').execute({});
     assert.equal(statusDuringRetry.detail.items[0].connectionState, 'recovering');
     assert.equal(statusDuringRetry.detail.items[0].grant.needsReauth, false);
     assert.equal(statusDuringRetry.detail.items[0].grant.refreshFailureKind, 'transient');
@@ -1532,7 +1532,7 @@ test('启动刷新收到 invalid_grant 时才标记需重新授权，并记录�
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig({ connectors: [connector] }));
-    const status = await tools.defs.get('mcp_connector_status').execute({});
+    const status = await tools.defs.get('connector_status').execute({});
     assert.equal(status.detail.items[0].connectionState, 'reauth');
     assert.equal(status.detail.items[0].grant.needsReauth, true);
     assert.equal(status.detail.items[0].grant.refreshFailureKind, 'permanent');
@@ -1550,7 +1550,7 @@ test('检测到旧企查查 OAuth 插件仍启用时阻断同名 Server，避免
   loader.entries.set('qcc-mcp-oauth', { id: 'qcc-mcp-oauth', disabled: false, options: { config: {} } });
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig());
-  const result = await tools.defs.get('mcp_connector_connect').execute({ connectorId: 'qcc-company' }, { signal: undefined });
+  const result = await tools.defs.get('connector_connect').execute({ connectorId: 'qcc-company' }, { signal: undefined });
   assert.equal(result.ok, false);
   assert.equal(result.detail.kind, 'plugin-conflict');
   assert.equal(result.detail.pluginId, 'qcc-mcp-oauth');
@@ -1588,24 +1588,24 @@ test('无鉴权 / api-key 连接器：none 直连、api-key 引导 configure', {
   await apply(ctx, baseConfig({ connectors }));
 
   try {
-    const connect = tools.defs.get('mcp_connector_connect');
+    const connect = tools.defs.get('connector_connect');
     const none = await connect.execute({
       connectorId: 'none-demo', scope: 'project', workspaceId: 'workspace-1',
     }, { signal: undefined });
     assert.equal(none.ok, true, none.message);
     assert.ok(loader.entries.has('mcp-none-demo-a'));
 
-    const status = await tools.defs.get('mcp_connector_status').execute({ workspaceId: 'workspace-1' });
+    const status = await tools.defs.get('connector_status').execute({ workspaceId: 'workspace-1' });
     assert.deepEqual(status.detail.items[0].scope.binding, {
       connectionKey: 'none-demo-a', global: false, projects: ['workspace-1'],
     });
     assert.equal(status.detail.items[0].scope.visibleInWorkspace, true);
     assert.equal(status.detail.items[0].canRename, false);
-    const rejectedRename = await tools.defs.get('mcp_connector_rename').execute({ key: 'none-demo-a', name: '本机别名' });
+    const rejectedRename = await tools.defs.get('connector_rename').execute({ key: 'none-demo-a', name: '本机别名' });
     assert.equal(rejectedRename.ok, false);
     assert.match(rejectedRename.message, /市场连接器名称由目录维护/);
 
-    const scopeTool = tools.defs.get('mcp_connector_scope');
+    const scopeTool = tools.defs.get('connector_scope');
     const preview = await scopeTool.execute({
       action: 'preview', key: 'none-demo-a', mode: 'copy', targetScope: 'global',
     });
@@ -1651,7 +1651,7 @@ test('无鉴权 / api-key 连接器：none 直连、api-key 引导 configure', {
     });
     assert.equal(restoredProject.ok, true, restoredProject.message);
 
-    const duplicate = await tools.defs.get('mcp_connector_configure').execute({
+    const duplicate = await tools.defs.get('connector_configure').execute({
       name: 'Duplicate server owner', serverName: 'none-a', url, authMode: 'none', scope: 'global',
     });
     assert.equal(duplicate.ok, false);
@@ -1659,13 +1659,13 @@ test('无鉴权 / api-key 连接器：none 直连、api-key 引导 configure', {
 
     const restarted = makePluginContext({ shared });
     await apply(restarted.ctx, baseConfig({ connectors }));
-    const restoredStatus = await restarted.tools.defs.get('mcp_connector_status').execute({ workspaceId: 'workspace-1' });
+    const restoredStatus = await restarted.tools.defs.get('connector_status').execute({ workspaceId: 'workspace-1' });
     assert.deepEqual(restoredStatus.detail.items[0].scope.binding.projects, ['workspace-1']);
     assert.equal(restoredStatus.detail.items[0].scope.binding.global, false);
 
     const key = await connect.execute({ connectorId: 'apikey-demo' }, { signal: undefined });
     assert.equal(key.ok, false);
-    assert.match(key.message, /mcp_connector_configure/);
+    assert.match(key.message, /connector_configure/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -1687,7 +1687,7 @@ test('自定义 configure + JSON 导入 + 无中断重命名 + 停用/断开', {
   await apply(ctx, baseConfig());
 
   try {
-    const conf = await tools.defs.get('mcp_connector_configure').execute({
+    const conf = await tools.defs.get('connector_configure').execute({
       name: '我的数据源',
       url: manualUrl,
       serverName: 'my',
@@ -1699,20 +1699,20 @@ test('自定义 configure + JSON 导入 + 无中断重命名 + 停用/断开', {
     assert.equal(key, 'custom-my');
     assert.equal(loader.entries.get('mcp-custom-my').options.config.headers.Authorization, 'Bearer tok');
 
-    const imp = await tools.defs.get('mcp_connector_import_json').execute({
+    const imp = await tools.defs.get('connector_import_json').execute({
       json: JSON.stringify({ mcpServers: { vendor: { type: 'streamable-http', url: manualUrl, headers: { Authorization: 'Bearer vtok' } } } }),
     });
     assert.equal(imp.ok, true, imp.message);
     assert.equal(imp.detail.keys.length, 1);
     assert.equal(loader.entries.get('mcp-json-vendor').options.config.headers.Authorization, 'Bearer vtok');
 
-    const editable = await tools.defs.get('mcp_connector_get_editable_config').execute({ key: 'json-vendor' });
+    const editable = await tools.defs.get('connector_get_editable_config').execute({ key: 'json-vendor' });
     assert.equal(editable.ok, true, editable.message);
     assert.match(editable.detail.json, /<KEEP_EXISTING>/);
     assert.doesNotMatch(editable.detail.json, /vtok/);
     const rejectedDocument = JSON.parse(editable.detail.json);
     rejectedDocument.connections[0].bearerToken = 'denied';
-    const rejectedUpdate = await tools.defs.get('mcp_connector_reconfigure').execute({
+    const rejectedUpdate = await tools.defs.get('connector_reconfigure').execute({
       key: 'json-vendor', json: JSON.stringify(rejectedDocument),
     });
     assert.equal(rejectedUpdate.ok, false);
@@ -1722,7 +1722,7 @@ test('自定义 configure + JSON 导入 + 无中断重命名 + 停用/断开', {
     const updatedDocument = JSON.parse(editable.detail.json);
     updatedDocument.connections[0].bearerToken = 'next-token';
     updatedDocument.connections[0].headers['X-Tenant'] = 'qcc';
-    const updated = await tools.defs.get('mcp_connector_reconfigure').execute({
+    const updated = await tools.defs.get('connector_reconfigure').execute({
       key: 'json-vendor', json: JSON.stringify(updatedDocument),
     });
     assert.equal(updated.ok, true, updated.message);
@@ -1732,52 +1732,52 @@ test('自定义 configure + JSON 导入 + 无中断重命名 + 停用/断开', {
     assert.equal((await tables.get('snapshots').get(updated.detail.snapshotId)).reason, 'reconfigure');
 
     updatedDocument.connections[0].serverName = 'renamed-server';
-    const identityChange = await tools.defs.get('mcp_connector_reconfigure').execute({
+    const identityChange = await tools.defs.get('connector_reconfigure').execute({
       key: 'json-vendor', json: JSON.stringify(updatedDocument),
     });
     assert.equal(identityChange.ok, false);
     assert.match(identityChange.message, /serverName 是连接身份/);
 
     const beforeRenameConfig = structuredClone(loader.entries.get('mcp-json-vendor').options.config);
-    const renamed = await tools.defs.get('mcp_connector_rename').execute({ key: 'json-vendor', name: '  生产数据  ' });
+    const renamed = await tools.defs.get('connector_rename').execute({ key: 'json-vendor', name: '  生产数据  ' });
     assert.equal(renamed.ok, true, renamed.message);
     assert.equal(renamed.detail.name, '生产数据');
     assert.equal(renamed.detail.serverName, 'vendor');
     assert.equal(renamed.detail.enabled, true);
     assert.ok(renamed.detail.snapshotId);
     assert.deepEqual(loader.entries.get('mcp-json-vendor').options.config, beforeRenameConfig, '重命名不应重配 Host 条目');
-    const renamedStatus = await tools.defs.get('mcp_connector_status').execute({});
+    const renamedStatus = await tools.defs.get('connector_status').execute({});
     const renamedItem = renamedStatus.detail.items.find((item) => item.key === 'json-vendor');
     assert.equal(renamedItem.name, '生产数据');
     assert.equal(renamedItem.serverName, 'vendor');
     assert.equal(renamedItem.enabled, true);
     assert.equal(renamedItem.canRename, true);
     assert.equal(renamedItem.canEditConfiguration, true);
-    const exported = await tools.defs.get('mcp_connector_export_config').execute({});
+    const exported = await tools.defs.get('connector_export_config').execute({});
     assert.equal(JSON.parse(exported.detail.json).connections.find((item) => item.serverName === 'vendor').name, '生产数据');
     assert.equal((await tables.get('snapshots').get(renamed.detail.snapshotId)).reason, 'rename');
 
     for (const invalidName of ['  ', '生产\n数据', 'x'.repeat(81)]) {
-      const invalid = await tools.defs.get('mcp_connector_rename').execute({ key: 'json-vendor', name: invalidName });
+      const invalid = await tools.defs.get('connector_rename').execute({ key: 'json-vendor', name: invalidName });
       assert.equal(invalid.ok, false);
     }
-    const afterInvalidStatus = await tools.defs.get('mcp_connector_status').execute({});
+    const afterInvalidStatus = await tools.defs.get('connector_status').execute({});
     assert.equal(afterInvalidStatus.detail.items.find((item) => item.key === 'json-vendor').name, '生产数据');
 
     const restarted = makePluginContext({ shared: { tables } });
     await apply(restarted.ctx, baseConfig());
-    const restartedStatus = await restarted.tools.defs.get('mcp_connector_status').execute({});
+    const restartedStatus = await restarted.tools.defs.get('connector_status').execute({});
     assert.equal(restartedStatus.detail.items.find((item) => item.key === 'json-vendor').name, '生产数据');
     assert.equal(restarted.loader.entries.get('mcp-json-vendor').options.config.serverName, 'vendor');
 
-    const off = await tools.defs.get('mcp_connector_set_enabled').execute({ key, enabled: false });
+    const off = await tools.defs.get('connector_set_enabled').execute({ key, enabled: false });
     assert.equal(off.ok, true);
     assert.equal(loader.entries.get(`mcp-${key}`).disabled, true);
 
-    const disabledEditable = await tools.defs.get('mcp_connector_get_editable_config').execute({ key });
+    const disabledEditable = await tools.defs.get('connector_get_editable_config').execute({ key });
     const disabledDocument = JSON.parse(disabledEditable.detail.json);
     disabledDocument.connections[0].headers['X-Mode'] = 'disabled-edit';
-    const disabledUpdate = await tools.defs.get('mcp_connector_reconfigure').execute({
+    const disabledUpdate = await tools.defs.get('connector_reconfigure').execute({
       key, json: JSON.stringify(disabledDocument),
     });
     assert.equal(disabledUpdate.ok, true, disabledUpdate.message);
@@ -1786,7 +1786,7 @@ test('自定义 configure + JSON 导入 + 无中断重命名 + 停用/断开', {
     assert.equal(loader.entries.get(`mcp-${key}`).disabled, true);
     assert.equal(loader.entries.get(`mcp-${key}`).options.config.headers['X-Mode'], 'disabled-edit');
 
-    const dis = await tools.defs.get('mcp_connector_disconnect').execute({ key }, { signal: undefined });
+    const dis = await tools.defs.get('connector_disconnect').execute({ key }, { signal: undefined });
     assert.equal(dis.ok, true);
     assert.equal(loader.entries.has(`mcp-${key}`), false);
   } finally {
@@ -1807,7 +1807,7 @@ test('脱敏导出、配置快照预览与原子恢复可重复执行', { timeou
   await apply(ctx, baseConfig());
 
   try {
-    const configure = tools.defs.get('mcp_connector_configure');
+    const configure = tools.defs.get('connector_configure');
     const first = await configure.execute({ name: 'Snapshot Demo', serverName: 'snapshot-demo', url, authMode: 'bearer', bearerToken: 'old-token' });
     assert.equal(first.ok, true, first.message);
     assert.ok(first.detail.snapshotId);
@@ -1816,12 +1816,12 @@ test('脱敏导出、配置快照预览与原子恢复可重复执行', { timeou
     assert.equal(second.ok, true, second.message);
     assert.equal(loader.entries.get('mcp-custom-snapshot-demo').options.config.headers.Authorization, 'Bearer new-token');
 
-    const exported = await tools.defs.get('mcp_connector_export_config').execute({});
+    const exported = await tools.defs.get('connector_export_config').execute({});
     assert.equal(exported.ok, true);
     assert.doesNotMatch(exported.detail.json, /old-token|new-token/);
     assert.match(exported.detail.json, /<REDACTED:REENTER>/);
 
-    const snapshotTool = tools.defs.get('mcp_connector_snapshot');
+    const snapshotTool = tools.defs.get('connector_snapshot');
     const listed = await snapshotTool.execute({ action: 'list' });
     assert.equal(listed.ok, true);
     assert.ok(listed.detail.items.some((item) => item.id === second.detail.snapshotId));
@@ -1839,7 +1839,7 @@ test('脱敏导出、配置快照预览与原子恢复可重复执行', { timeou
     assert.equal(restoredAgain.ok, true, restoredAgain.message);
     assert.equal([...tables.get('connections').entries()].length, 1);
 
-    const disconnected = await tools.defs.get('mcp_connector_disconnect').execute({ key: 'custom-snapshot-demo' }, { signal: undefined });
+    const disconnected = await tools.defs.get('connector_disconnect').execute({ key: 'custom-snapshot-demo' }, { signal: undefined });
     assert.equal(disconnected.ok, true);
     assert.equal(loader.entries.has('mcp-custom-snapshot-demo'), false);
     const undoDisconnect = await snapshotTool.execute({ action: 'restore', snapshotId: disconnected.detail.snapshotId });
@@ -1862,7 +1862,7 @@ test('手动 HTTP initialize 失败时不保存、不启用且保留可操作错
   await apply(ctx, baseConfig());
 
   try {
-    const configured = await tools.defs.get('mcp_connector_configure').execute({
+    const configured = await tools.defs.get('connector_configure').execute({
       name: 'qa-unreachable',
       serverName: 'qa-unreachable',
       transport: 'streamable-http',
@@ -1873,7 +1873,7 @@ test('手动 HTTP initialize 失败时不保存、不启用且保留可操作错
     assert.match(configured.message, /连接验证失败/);
     assert.match(configured.message, /未保存连接/);
     assert.equal(loader.entries.size, 0);
-    assert.equal((await tools.defs.get('mcp_connector_status').execute({})).detail.items.length, 0);
+    assert.equal((await tools.defs.get('connector_status').execute({})).detail.items.length, 0);
     assert.equal([...tables.get('connections').entries()].length, 0);
   } finally {
     await new Promise((resolve) => invalidServer.close(resolve));
@@ -1897,7 +1897,7 @@ test('stdio Host 启动失败时不保存且返回进程诊断', { timeout: 1500
     }],
   }));
 
-  const connected = await tools.defs.get('mcp_connector_connect').execute({
+  const connected = await tools.defs.get('connector_connect').execute({
     connectorId: 'stdio-failure', scope: 'project', workspaceId: 'workspace-1',
   }, { signal: undefined });
   assert.equal(connected.ok, false);
@@ -1905,7 +1905,7 @@ test('stdio Host 启动失败时不保存且返回进程诊断', { timeout: 1500
   assert.match(connected.message, /启动命令不存在/);
   assert.match(connected.message, /未保存连接/);
   assert.equal(loader.entries.size, 0);
-  assert.equal((await tools.defs.get('mcp_connector_status').execute({})).detail.items.length, 0);
+  assert.equal((await tools.defs.get('connector_status').execute({})).detail.items.length, 0);
   assert.equal([...tables.get('connections').entries()].length, 0);
   const scopeAfterFailure = await tables.get('connection_scopes').get('active');
   assert.deepEqual(scopeAfterFailure.bindings, [], '连接提交失败必须回滚作用域绑定');
@@ -1923,13 +1923,13 @@ test('重连保留记录，串行处理停用，并安全报告 provision 失败
   const { apply } = await import('../lib/index.js');
   try {
     await apply(ctx, baseConfig());
-    const configured = await tools.defs.get('mcp_connector_configure').execute({
+    const configured = await tools.defs.get('connector_configure').execute({
       name: 'Reconnect', serverName: 'reconnect-test', transport: 'stdio', command: 'node', args: ['server.js'],
     });
     assert.equal(configured.ok, true);
     const key = configured.detail.key;
-    const reconnect = tools.defs.get('mcp_connector_reconnect');
-    const toggle = tools.defs.get('mcp_connector_set_enabled');
+    const reconnect = tools.defs.get('connector_reconnect');
+    const toggle = tools.defs.get('connector_set_enabled');
     tools.register({ name: 'mcp__reconnect-test__lookup', parameters: {} });
     const before = await tables.get('connections').get(key);
     assert.equal((await reconnect.execute({ key: 'missing' })).ok, false);
@@ -1974,31 +1974,31 @@ test('stdio 市场连接、自定义配置与 JSON 导入均透传给 dsh-mcp-cl
   }));
 
   try {
-    const connected = await tools.defs.get('mcp_connector_connect').execute({ connectorId: 'local-market' }, { signal: undefined });
+    const connected = await tools.defs.get('connector_connect').execute({ connectorId: 'local-market' }, { signal: undefined });
     assert.equal(connected.ok, true, connected.message);
     assert.deepEqual(loader.entries.get('mcp-local-market-main').options.config, {
       transport: 'stdio', serverName: 'local-market', command: 'uvx', args: ['trusted-local-server'],
       env: { LOG_LEVEL: 'info' }, cwd: '/tmp', failOnStartupError: true,
     });
-    const pendingHealth = await tools.defs.get('mcp_connector_health_check').execute({ connectorId: 'local-market' });
+    const pendingHealth = await tools.defs.get('connector_health_check').execute({ connectorId: 'local-market' });
     assert.equal(pendingHealth.detail.items[0].connectionState, 'unknown');
     assert.equal(pendingHealth.detail.items[0].diagnostic.code, 'host-tools-pending');
     assert.match(pendingHealth.detail.items[0].diagnostic.action, /Host 日志|重新检查/);
-    const pendingTools = await tools.defs.get('mcp_connector_tools_list').execute({ connectorId: 'local-market' });
+    const pendingTools = await tools.defs.get('connector_tools_list').execute({ connectorId: 'local-market' });
     assert.equal(pendingTools.ok, false);
     assert.equal(pendingTools.detail.servers[0].errorKind, 'startup');
     assert.equal(pendingTools.detail.connectionState, 'unknown');
     assert.equal(pendingTools.detail.unknownServers, 1);
     assert.equal(pendingTools.detail.diagnostic.code, 'host-tools-pending');
     tools.register({ name: 'mcp__local-market__search', description: 'Search local market', parameters: {} });
-    const readyHealth = await tools.defs.get('mcp_connector_health_check').execute({ connectorId: 'local-market' });
+    const readyHealth = await tools.defs.get('connector_health_check').execute({ connectorId: 'local-market' });
     assert.equal(readyHealth.detail.items[0].connectionState, 'healthy');
-    const listed = await tools.defs.get('mcp_connector_tools_list').execute({ connectorId: 'local-market' });
+    const listed = await tools.defs.get('connector_tools_list').execute({ connectorId: 'local-market' });
     assert.equal(listed.ok, true, listed.message);
     assert.equal(listed.detail.servers[0].live, true);
     assert.equal(listed.detail.servers[0].tools[0].name, 'search');
 
-    const configured = await tools.defs.get('mcp_connector_configure').execute({
+    const configured = await tools.defs.get('connector_configure').execute({
     name: 'Local Files', transport: 'stdio', serverName: 'local-files', command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
     envJson: JSON.stringify({ LOG_LEVEL: 'info' }), cwd: '/tmp',
@@ -2010,7 +2010,7 @@ test('stdio 市场连接、自定义配置与 JSON 导入均透传给 dsh-mcp-cl
       env: { LOG_LEVEL: 'info' }, cwd: '/tmp', failOnStartupError: true,
     });
 
-    const switchedToHttp = await tools.defs.get('mcp_connector_configure').execute({
+    const switchedToHttp = await tools.defs.get('connector_configure').execute({
     name: 'Local Files', transport: 'streamable-http', serverName: 'local-files',
       url: httpUrl, authMode: 'none',
     });
@@ -2020,7 +2020,7 @@ test('stdio 市场连接、自定义配置与 JSON 导入均透传给 dsh-mcp-cl
       headers: {}, failOnStartupError: true,
     });
 
-    const switchedBackToStdio = await tools.defs.get('mcp_connector_configure').execute({
+    const switchedBackToStdio = await tools.defs.get('connector_configure').execute({
     name: 'Local Files', transport: 'stdio', serverName: 'local-files', command: 'uvx', args: ['trusted-server'],
   });
     assert.equal(switchedBackToStdio.ok, true, switchedBackToStdio.message);
@@ -2029,7 +2029,7 @@ test('stdio 市场连接、自定义配置与 JSON 导入均透传给 dsh-mcp-cl
       env: {}, cwd: process.cwd(), failOnStartupError: true,
     });
 
-    const imported = await tools.defs.get('mcp_connector_import_json').execute({
+    const imported = await tools.defs.get('connector_import_json').execute({
     json: JSON.stringify({ mcpServers: { memory: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-memory'] } } }),
   });
     assert.equal(imported.ok, true, imported.message);
@@ -2065,13 +2065,13 @@ test('stdio 市场凭据绑定：多字段只在本机注入 env，目录和状�
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig({ connectors: [connector] }));
 
-  const connect = await tools.defs.get('mcp_connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
+  const connect = await tools.defs.get('connector_connect').execute({ connectorId: connector.id }, { signal: undefined });
   assert.equal(connect.ok, false);
   assert.equal(connect.detail.transport, 'stdio');
   assert.equal(connect.detail.command, 'uvx');
   assert.equal(connect.detail.credentialFields.length, 2);
 
-  const missing = await tools.defs.get('mcp_connector_configure').execute({
+  const missing = await tools.defs.get('connector_configure').execute({
     connectorId: connector.id,
     credentialValues: { apiToken: 'stdio-local-secret' },
   });
@@ -2079,7 +2079,7 @@ test('stdio 市场凭据绑定：多字段只在本机注入 env，目录和状�
   assert.match(missing.message, /区域 必填/);
   assert.equal([...tables.get('connections').entries()].length, 0);
 
-  const configured = await tools.defs.get('mcp_connector_configure').execute({
+  const configured = await tools.defs.get('connector_configure').execute({
     connectorId: connector.id,
     credentialValues: { apiToken: 'stdio-local-secret', region: 'cn-east-1' },
   });
@@ -2099,8 +2099,8 @@ test('stdio 市场凭据绑定：多字段只在本机注入 env，目录和状�
   });
   assert.equal([...tables.get('connections').entries()][0][1].env.VENDOR_API_TOKEN, 'stdio-local-secret');
 
-  const catalog = await tools.defs.get('mcp_connector_catalog').execute({ keyword: connector.id });
-  const status = await tools.defs.get('mcp_connector_status').execute({});
+  const catalog = await tools.defs.get('connector_catalog').execute({ keyword: connector.id });
+  const status = await tools.defs.get('connector_status').execute({});
   assert.deepEqual(catalog.detail.items[0].servers[0].credentialBindings, {
     VENDOR_API_TOKEN: 'apiToken',
     VENDOR_REGION: 'region',
@@ -2157,7 +2157,7 @@ test('目录识别旧版 API Key 单入口并提示升级 OAuth 一键授权', a
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig({ connectors: [connector] }));
 
-  const catalog = await tools.defs.get('mcp_connector_catalog').execute({ keyword: 'qcc-document' });
+  const catalog = await tools.defs.get('connector_catalog').execute({ keyword: 'qcc-document' });
   const item = catalog.detail.items[0];
   assert.equal(item.connectionComplete, false);
   assert.deepEqual(item.missingServers, [{
@@ -2193,7 +2193,7 @@ test('市场 Bearer 连接器一次填写凭据批量连接全部 Server', { tim
   await apply(ctx, baseConfig({ connectors }));
 
   try {
-    const configured = await tools.defs.get('mcp_connector_configure').execute({
+    const configured = await tools.defs.get('connector_configure').execute({
       connectorId: 'legal-market',
       bearerToken: 'shared-token',
     });
@@ -2203,9 +2203,9 @@ test('市场 Bearer 连接器一次填写凭据批量连接全部 Server', { tim
     assert.equal(loader.entries.get('mcp-legal-market-law').options.config.headers.Accept, 'application/json, text/event-stream');
     assert.equal(loader.entries.get('mcp-legal-market-case').options.config.headers.Authorization, 'Bearer shared-token');
 
-    const status = await tools.defs.get('mcp_connector_status').execute({});
+    const status = await tools.defs.get('connector_status').execute({});
     assert.equal(status.detail.items.filter((item) => item.connectorId === 'legal-market').length, 2);
-    const catalog = await tools.defs.get('mcp_connector_catalog').execute({});
+    const catalog = await tools.defs.get('connector_catalog').execute({});
     assert.equal(catalog.detail.items.find((item) => item.id === 'legal-market')?.connected.length, 2);
     assert.equal(catalog.detail.items.find((item) => item.id === 'legal-market')?.connectionState, 'healthy');
   } finally {
@@ -2230,12 +2230,12 @@ test('市场凭据校验失败时不进入已安装、不持久化 Key', { timeo
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig({ connectors }));
   try {
-    const configured = await tools.defs.get('mcp_connector_configure').execute({ connectorId: 'wind-invalid', bearerToken: 'wrong-key' });
+    const configured = await tools.defs.get('connector_configure').execute({ connectorId: 'wind-invalid', bearerToken: 'wrong-key' });
     assert.equal(configured.ok, false);
     assert.match(configured.message, /连接验证失败/);
     assert.match(configured.message, /未保存连接/);
     assert.equal(loader.entries.size, 0);
-    assert.equal((await tools.defs.get('mcp_connector_status').execute({})).detail.items.length, 0);
+    assert.equal((await tools.defs.get('connector_status').execute({})).detail.items.length, 0);
     assert.equal([...tables.get('connections').entries()].length, 0);
   } finally {
     await new Promise((resolve) => authServer.close(resolve));
@@ -2270,7 +2270,7 @@ test('多 Server 严格启动中途失败时原子回滚已创建条目与连接
   await apply(ctx, baseConfig({ connectors }));
 
   try {
-    const configured = await tools.defs.get('mcp_connector_configure').execute({
+    const configured = await tools.defs.get('connector_configure').execute({
       connectorId: 'batch-startup', bearerToken: 'batch-token',
     });
     assert.equal(configured.ok, false);
@@ -2278,7 +2278,7 @@ test('多 Server 严格启动中途失败时原子回滚已创建条目与连接
     assert.equal(loader.entries.size, 0, '首个已创建 Host 条目必须回滚');
     assert.equal([...tables.get('connections').entries()].length, 0);
     assert.equal([...tables.get('snapshots').entries()].length, 0, '失败操作不保留无效的预变更快照');
-    assert.equal((await tools.defs.get('mcp_connector_status').execute({})).detail.items.length, 0);
+    assert.equal((await tools.defs.get('connector_status').execute({})).detail.items.length, 0);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
@@ -2316,14 +2316,14 @@ test('多 Server 快照恢复中途失败时原子保留恢复前 Host 与持久
   await apply(ctx, baseConfig({ connectors }));
 
   try {
-    const configure = tools.defs.get('mcp_connector_configure');
+    const configure = tools.defs.get('connector_configure');
     const initial = await configure.execute({ connectorId: 'batch-restore', bearerToken: 'old-token' });
     assert.equal(initial.ok, true, initial.message);
     const changed = await configure.execute({ connectorId: 'batch-restore', bearerToken: 'new-token' });
     assert.equal(changed.ok, true, changed.message);
 
     failRestore = true;
-    const restored = await tools.defs.get('mcp_connector_snapshot').execute({ action: 'restore', snapshotId: changed.detail.snapshotId });
+    const restored = await tools.defs.get('connector_snapshot').execute({ action: 'restore', snapshotId: changed.detail.snapshotId });
     assert.equal(restored.ok, false);
     assert.match(restored.message, /快照恢复失败/);
     for (const id of ['mcp-batch-restore-first', 'mcp-batch-restore-second']) {
@@ -2388,13 +2388,13 @@ test('凭据型连接器在有状态会话中携带 Bearer Token 并加载全部
     const { apply } = await import('../lib/index.js');
     await apply(ctx, baseConfig({ connectors }));
 
-    const configured = await tools.defs.get('mcp_connector_configure').execute({
+    const configured = await tools.defs.get('connector_configure').execute({
       connectorId: 'wind-demo',
       bearerToken: 'wind-key',
     });
     assert.equal(configured.ok, true, configured.message);
 
-    const listed = await tools.defs.get('mcp_connector_tools_list').execute({ connectorId: 'wind-demo' });
+    const listed = await tools.defs.get('connector_tools_list').execute({ connectorId: 'wind-demo' });
     assert.equal(listed.ok, true, listed.message);
     assert.equal(listed.detail.totalTools, 2);
     assert.deepEqual(listed.detail.servers[0].tools.map((tool) => tool.name), ['quote', 'history']);
@@ -2406,13 +2406,13 @@ test('凭据型连接器在有状态会话中携带 Bearer Token 并加载全部
     assert.equal(seen.protocolVersions[3], '2025-03-26');
     assert.equal(seen.protocolVersions[4], '2025-03-26');
 
-    const searched = await tools.defs.get('mcp_connector_tool_search').execute({ query: '行情', connectorId: 'wind-demo' });
+    const searched = await tools.defs.get('connector_tool_search').execute({ query: '行情', connectorId: 'wind-demo' });
     assert.equal(searched.ok, true, searched.message);
     assert.deepEqual(searched.detail.items.map((tool) => tool.name), ['quote', 'history']);
     assert.equal(searched.detail.discoveryOnly, true);
     assert.doesNotMatch(JSON.stringify(searched), /wind-key/);
 
-    const detail = await tools.defs.get('mcp_connector_tool_detail').execute({
+    const detail = await tools.defs.get('connector_tool_detail').execute({
       toolName: 'quote', connectorId: 'wind-demo', serverName: 'wind-demo',
     });
     assert.equal(detail.ok, true, detail.message);
@@ -2420,7 +2420,7 @@ test('凭据型连接器在有状态会话中携带 Bearer Token 并加载全部
     assert.equal(tables.get('tool_catalog').entries().next().value[1].tools.length, 2);
 
     await new Promise((resolve) => mcpServer.close(resolve));
-    const cached = await tools.defs.get('mcp_connector_tools_list').execute({ connectorId: 'wind-demo' });
+    const cached = await tools.defs.get('connector_tools_list').execute({ connectorId: 'wind-demo' });
     assert.equal(cached.ok, false);
     assert.equal(cached.detail.cachedServers, 1);
     assert.equal(cached.detail.servers[0].cached, true);
@@ -2428,10 +2428,10 @@ test('凭据型连接器在有状态会话中携带 Bearer Token 并加载全部
 
     const restarted = makePluginContext({ shared: { tables } });
     await apply(restarted.ctx, baseConfig({ connectors }));
-    const afterRestart = await restarted.tools.defs.get('mcp_connector_tool_search').execute({ query: '行情', connectorId: 'wind-demo' });
+    const afterRestart = await restarted.tools.defs.get('connector_tool_search').execute({ query: '行情', connectorId: 'wind-demo' });
     assert.deepEqual(afterRestart.detail.items.map((tool) => tool.name), ['quote', 'history']);
-    const status = await restarted.tools.defs.get('mcp_connector_status').execute({});
-    const disconnected = await restarted.tools.defs.get('mcp_connector_disconnect').execute(
+    const status = await restarted.tools.defs.get('connector_status').execute({});
+    const disconnected = await restarted.tools.defs.get('connector_disconnect').execute(
       { key: status.detail.items[0].key },
       { signal: new AbortController().signal },
     );
@@ -2461,10 +2461,10 @@ test('历史凭据失效导致所有 Server 失败时 toolsList 明确返回不�
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig({ connectors }));
   try {
-    const configured = await tools.defs.get('mcp_connector_configure').execute({ connectorId: 'wind-expired', bearerToken: 'initially-valid' });
+    const configured = await tools.defs.get('connector_configure').execute({ connectorId: 'wind-expired', bearerToken: 'initially-valid' });
     assert.equal(configured.ok, true, configured.message);
     allow = false;
-    const listed = await tools.defs.get('mcp_connector_tools_list').execute({ connectorId: 'wind-expired' });
+    const listed = await tools.defs.get('connector_tools_list').execute({ connectorId: 'wind-expired' });
     assert.equal(listed.ok, false);
     assert.equal(listed.detail.availableServers, 0);
     assert.equal(listed.detail.failedServers, 1);
@@ -2472,15 +2472,15 @@ test('历史凭据失效导致所有 Server 失败时 toolsList 明确返回不�
     assert.equal(listed.detail.connectionState, 'reauth');
     assert.equal(listed.detail.diagnostic.stage, 'authentication');
     assert.ok(Number.isInteger(listed.detail.lastSuccessfulAt));
-    const health = await tools.defs.get('mcp_connector_health_check').execute({ connectorId: 'wind-expired' });
+    const health = await tools.defs.get('connector_health_check').execute({ connectorId: 'wind-expired' });
     assert.equal(health.ok, true);
     assert.equal(health.detail.items[0].connectionState, 'reauth');
-    const catalog = await tools.defs.get('mcp_connector_catalog').execute({ keyword: 'Wind Expired' });
+    const catalog = await tools.defs.get('connector_catalog').execute({ keyword: 'Wind Expired' });
     assert.equal(catalog.detail.items[0].connectionState, 'reauth');
     assert.equal(catalog.detail.items[0].connectionLabel, '需重新授权');
     assert.equal(catalog.detail.items[0].diagnostic.code, 'auth');
     assert.equal(catalog.detail.items[0].lastSuccessfulAt, listed.detail.lastSuccessfulAt);
-    const status = await tools.defs.get('mcp_connector_status').execute({});
+    const status = await tools.defs.get('connector_status').execute({});
     assert.equal(status.detail.items[0].connectionState, 'reauth');
     assert.equal(status.detail.items[0].diagnostic.stage, 'authentication');
     assert.equal(status.detail.items[0].lastSuccessfulAt, listed.detail.lastSuccessfulAt);
@@ -2493,7 +2493,7 @@ test('未配置远程目录时刷新市场也返回正常用户提示', async ()
   const { ctx, tools } = makePluginContext();
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig());
-  const refreshed = await tools.defs.get('mcp_connector_refresh_catalog').execute({});
+  const refreshed = await tools.defs.get('connector_refresh_catalog').execute({});
   assert.equal(refreshed.ok, true);
   assert.match(refreshed.message, /^市场已刷新，共 \d+ 个连接器$/);
   assert.doesNotMatch(refreshed.message, /catalogUrl|无远程目录/);
@@ -2525,10 +2525,10 @@ test('URL 安装 + 目录上下架', { timeout: 15000 }, async () => {
   const { apply } = await import('../lib/index.js');
   await apply(ctx, baseConfig());
 
-  const installed = await tools.defs.get('mcp_connector_install_from_url').execute({ url: `http://127.0.0.1:${port}/connector.json` });
+  const installed = await tools.defs.get('connector_install_from_url').execute({ url: `http://127.0.0.1:${port}/connector.json` });
   assert.equal(installed.ok, true, installed.message);
 
-  const cat = await tools.defs.get('mcp_connector_catalog').execute({ keyword: 'URL 安装' });
+  const cat = await tools.defs.get('connector_catalog').execute({ keyword: 'URL 安装' });
   assert.equal(cat.ok, true);
   assert.equal(cat.detail.items.length, 1);
   assert.equal(cat.detail.items[0].id, 'url-demo');
@@ -2536,12 +2536,12 @@ test('URL 安装 + 目录上下架', { timeout: 15000 }, async () => {
 
   const restarted = makePluginContext({ shared });
   await apply(restarted.ctx, baseConfig());
-  const restoredCatalog = await restarted.tools.defs.get('mcp_connector_catalog').execute({ keyword: 'URL 安装' });
+  const restoredCatalog = await restarted.tools.defs.get('connector_catalog').execute({ keyword: 'URL 安装' });
   assert.equal(restoredCatalog.detail.items[0].id, 'url-demo', '重启后应恢复 URL 安装的目录条目');
 
-  const pub = await tools.defs.get('mcp_connector_publish').execute({ connectorId: 'url-demo', published: false });
+  const pub = await tools.defs.get('connector_publish').execute({ connectorId: 'url-demo', published: false });
   assert.equal(pub.ok, true);
-  const cat2 = await tools.defs.get('mcp_connector_catalog').execute({ keyword: 'URL 安装' });
+  const cat2 = await tools.defs.get('connector_catalog').execute({ keyword: 'URL 安装' });
   assert.equal(cat2.detail.items.length, 0, '下架后不可见');
 
   catalogSrv.close();
@@ -2560,7 +2560,7 @@ test('重启恢复：连接记录持久化并重新挂载条目', { timeout: 300
     servers: [{ serverKey: 'company', url: `${oauth.base}/mcp/company/stream`, serverName: 'acme-company', transport: 'streamable-http', headers: {} }],
   };
   await apply(first.ctx, baseConfig({ connectors: [connector] }));
-  const promise = first.tools.defs.get('mcp_connector_connect').execute({ connectorId: 'acme' }, { signal: undefined });
+  const promise = first.tools.defs.get('connector_connect').execute({ connectorId: 'acme' }, { signal: undefined });
   await autoApprove(first.logs);
   await promise;
   assert.ok(first.loader.entries.has('mcp-acme-company'));
@@ -2571,7 +2571,7 @@ test('重启恢复：连接记录持久化并重新挂载条目', { timeout: 300
   assert.ok(second.loader.entries.has('mcp-acme-company'), '重启后恢复条目');
   assert.match(second.loader.entries.get('mcp-acme-company').options.config.headers.Authorization, /^Bearer /);
 
-  const status = await second.tools.defs.get('mcp_connector_status').execute({});
+  const status = await second.tools.defs.get('connector_status').execute({});
   assert.equal(status.detail.items.length, 1);
 
   await oauth.close();
@@ -2601,7 +2601,7 @@ test('治理策略经对话工具预览后在 Host guard 生效，并在重启�
   first.tools.register({ name: 'mcp__acme-search__read', description: '', parameters: {} });
   first.tools.register({ name: 'mcp__acme-search__remove', description: '', parameters: {} });
 
-  const policy = first.tools.defs.get('mcp_connector_policy');
+  const policy = first.tools.defs.get('connector_policy');
   const preview = await policy.execute({
     action: 'preview', scope: 'tool', effect: 'deny', connectorId: 'acme',
     serverName: 'acme-search', toolName: 'remove', publicName: 'mcp__acme-search__remove',
@@ -2628,7 +2628,7 @@ test('治理策略经对话工具预览后在 Host guard 生效，并在重启�
   const secondGuard = [...second.tools.guards][0];
   assert.match(secondGuard({ name: 'mcp__acme-search__remove' }), /Tool 策略拒绝/, '重启后恢复执行拒绝');
 
-  const restored = await second.tools.defs.get('mcp_connector_policy').execute({
+  const restored = await second.tools.defs.get('connector_policy').execute({
     action: 'rollback', rollbackRevision: 0, expectedRevision: 1,
   });
   assert.equal(restored.ok, true, restored.message);

@@ -127,5 +127,5 @@ Tier 3  自服务（用户侧直加）        自定义配置 / 粘贴 JSON / UR
 
 配套改动：
 - Tier 1 已拆分为公开仓库 [`duhu2000/dsh-mcp-connector-registry`](https://github.com/duhu2000/dsh-mcp-connector-registry)，包含一卡一文件、JSON Schema、确定性构建、密钥审计、CI 与定时健康巡检。
-- 插件工具面新增 `mcp_connector_install_from_url`（Tier 3 的 URL 安装）
+- 插件工具面新增 `connector_install_from_url`（Tier 3 的 URL 安装）
 - 目录来源在 PLAN §3.1 基础上明确：远程 registry 上游 = PR 注册表（Tier 2 crawler 暂不接入）

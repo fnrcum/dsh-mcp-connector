@@ -84,7 +84,7 @@ If the plugin helps you connect an MCP server faster, consider [starring the rep
 - Credential and MCP initialize validation before HTTP API-key connectors are saved as installed, plus declarative multi-field credential-to-env bindings for marketplace stdio connectors.
 - Dynamic tool discovery grouped by MCP server, including descriptions, search, parameter details, batched rendering, and an independent scroll region. When live discovery fails, the UI shows the last successful tool cache with observation-time and stale markers.
 - Same-origin SSE updates the UI after connection, catalog, health, tool, governance, or scope changes. Event payloads contain no connection identifiers, endpoints, errors, or credentials.
-- Progressive `mcp_connector_tool_search` and `mcp_connector_tool_detail` tools search last-success metadata and reveal a bounded, sanitized input schema on demand without executing the target MCP tool.
+- Progressive `connector_tool_search` and `connector_tool_detail` tools search last-success metadata and reveal a bounded, sanitized input schema on demand without executing the target MCP tool.
 - Curated prompt templates that can open a DSH conversation and prefill its draft; missing variables are requested before the prompt is sent.
 - Persistent connection lifecycle management: restore on restart, enable/disable, disconnect, retry transient OAuth refresh failures with bounded backoff, and revoke authorization. Cards declaring issuer-level sharing reuse one grant; a cross-process lock and per-grant atomic journal prevent Desktop and Web hosts from consuming or overwriting the same rotating refresh token.
 - In-place configuration editing for custom and JSON-imported connections: edit normalized JSON from Installed and reconnect without deleting the connection. Existing sensitive values use local keep markers, and validation, startup, or persistence failures leave the previous connection usable.
@@ -197,8 +197,8 @@ The proxy variables must be present in the running DSH process. After changing t
 
 `compactManagementTools` defaults to `false` for backward compatibility. Set it to `true` in the plugin configuration and reload the plugin (or restart DSH) to expose only two management tools at the next inference boundary:
 
-- `mcp_connector_discover`: fixed read-only actions `catalog`, `status`, `search` (requires `query`), and `detail` (requires `toolName`). Example: `{"action":"search","query":"weather","limit":5}`.
-- `mcp_connector_session_tools`: unchanged session activation, confirmation and TTL behavior.
+- `connector_discover`: fixed read-only actions `catalog`, `status`, `search` (requires `query`), and `detail` (requires `toolName`). Example: `{"action":"search","query":"weather","limit":5}`.
+- `connector_session_tools`: unchanged session activation, confirmation and TTL behavior.
 
 Use the connector UI for connection setup, authorization, import, editing, snapshots and migration. There is no arbitrary execution proxy or automatic management-tool loading. Keep this option `false` for conversation-only deployments or workflows that depend on legacy tool names. Set it back to `false` and reload to restore those names; do not run duplicate plugin instances.
 

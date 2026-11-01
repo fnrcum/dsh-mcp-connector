@@ -49,7 +49,7 @@ function documentBase(generatedAt) {
     version: VERSION,
     generatedAt: isoTime(generatedAt),
     redacted: true,
-    instructions: INSTRUCTIONS,
+    instructions: t(INSTRUCTIONS),
   };
 }
 
@@ -103,7 +103,7 @@ export function createCustomHttpTemplate({
     throw new TypeError(t("自定义模板只支持 none、bearer 或 api-key"));
   }
   const connection = {
-    name: CUSTOM_NAME,
+    name: t(CUSTOM_NAME),
     serverName: CUSTOM_SERVER_NAME,
     transport: 'streamable-http',
     url: REDACTED,

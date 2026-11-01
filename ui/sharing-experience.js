@@ -229,19 +229,19 @@ export function renderSharingExperiencePreview(input) {
     '',
     t("> 本草稿只包含用户主动填写的任务、版本、步骤状态与限制；复制草稿不代表连接或业务调用成功。"),
     '',
-    t("- 任务：{p0}", { p0: displayValue(draft.task) }),
+    t("- 任务：{p0}", { p0: t(displayValue(draft.task)) }),
     t("- DSH 版本：{p0}", { p0: displayValue(draft.versions.dsh) }),
     t("- 插件版本：{p0}", { p0: displayValue(draft.versions.plugin) }),
     t("- 宿主：{p0}", { p0: displayValue(draft.versions.host) }),
     '',
     t("## 步骤"),
     '',
-    ...draft.steps.map((step, index) => `${index + 1}. [${STATUS_LABELS[step.status]}] ${escapeMarkdown(step.name)}`),
+    ...draft.steps.map((step, index) => `${index + 1}. [${STATUS_LABELS[step.status]}] ${escapeMarkdown(t(step.name))}`),
     '',
     t("## 限制"),
     '',
     ...(draft.limitations.length > 0
-      ? draft.limitations.map((item) => `- ${escapeMarkdown(item)}`)
+      ? draft.limitations.map((item) => `- ${escapeMarkdown(t(item))}`)
       : [t("- 未填写")]),
     '',
   ];
@@ -293,7 +293,7 @@ export function mount(root, { openDraft, showMessage } = {}) {
   templateLabel.append(makeElement(document, 'span', { text: t("任务模板") }));
   const template = makeElement(document, 'select');
   for (const [value, item] of Object.entries(SHARING_CASE_TEMPLATES)) {
-    const option = makeElement(document, 'option', { text: item.task });
+    const option = makeElement(document, 'option', { text: t(item.task) });
     option.value = value;
     template.append(option);
   }
@@ -301,7 +301,7 @@ export function mount(root, { openDraft, showMessage } = {}) {
   template.value = activeTemplateId;
   templateLabel.append(template);
   form.append(templateLabel);
-  const task = addLabeledInput(document, form, t("任务"), draft.task);
+  const task = addLabeledInput(document, form, t("任务"), t(draft.task));
   const dshVersion = addLabeledInput(document, form, t("DSH 版本"), draft.versions.dsh);
   const pluginVersion = addLabeledInput(document, form, t("插件版本"), draft.versions.plugin);
   const host = addLabeledInput(document, form, t("宿主"), draft.versions.host);
@@ -309,7 +309,7 @@ export function mount(root, { openDraft, showMessage } = {}) {
   const limitationsLabel = makeElement(document, 'label', { className: 'sharing-experience-field' });
   limitationsLabel.append(makeElement(document, 'span', { text: t("限制（每行一项）") }));
   const limitations = makeElement(document, 'textarea');
-  limitations.value = draft.limitations.join('\n');
+  limitations.value = draft.limitations.map((item) => t(item)).join('\n');
   limitationsLabel.append(limitations);
   form.append(steps, limitationsLabel);
 
@@ -338,7 +338,7 @@ export function mount(root, { openDraft, showMessage } = {}) {
     steps.replaceChildren();
     draft.steps.forEach((step, index) => {
       const row = makeElement(document, 'div', { className: 'sharing-experience-step' });
-      const name = addLabeledInput(document, row, t("步骤 {p0}", { p0: index + 1 }), step.name);
+      const name = addLabeledInput(document, row, t("步骤 {p0}", { p0: index + 1 }), t(step.name));
       name.dataset.stepName = String(index);
       const label = makeElement(document, 'label', { className: 'sharing-experience-field' });
       label.append(makeElement(document, 'span', { text: t("状态") }));
@@ -388,8 +388,8 @@ export function mount(root, { openDraft, showMessage } = {}) {
       const nextDraft = createSharingExperienceFromTemplate(requestedTemplateId, versions);
       draft = nextDraft;
       activeTemplateId = requestedTemplateId;
-      task.value = draft.task;
-      limitations.value = draft.limitations.join('\n');
+      task.value = t(draft.task);
+      limitations.value = draft.limitations.map((item) => t(item)).join('\n');
       renderStepControls();
       preview.textContent = renderSharingExperiencePreview(draft);
       notify(t("已载入公开教程模板；所有步骤保持“未测试”，请按实际情况编辑。"));

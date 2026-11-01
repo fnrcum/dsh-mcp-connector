@@ -42,7 +42,7 @@ dsh-mcp-connector
 │   │    ├─ /mcp-connector/ui/*   静态 SPA（HTML/JS/CSS，经信任围栏）
 │   │    └─ /mcp-connector/api/*  JSON RPC：catalog/connect/configure/import/
 │   │                              status/install/uninstall/refresh/publish/probe
-│   └─ mcp_connector_* 工具        保留（语音/对话入口与服务端 API 同源）
+│   └─ connector_* 工具        保留（语音/对话入口与服务端 API 同源）
 └─ 客户端半（client, React/浏览器）  新增：
     ├─ ctx.slots.register('sidebar.footer.action', NavButton)
     │       左侧栏入口「MCP连接器」图标按钮
@@ -54,7 +54,7 @@ dsh-mcp-connector
 **关键点**
 - SPA 是**自包含静态页**，只通过 `/mcp-connector/api/*` 与 host 通信，不深耦合 DSS React 组件（升级/换肤不破坏）。
 - 所有 API 走**信任围栏**（仅 DSH web 应用可调，杜绝本地任意页面 CSRF 读 token）。
-- 服务端 API 与 `mcp_connector_*` 工具**共用同一 `api` facade**（catalog/connect/…），保证「图形页」与「对话」状态一致。
+- 服务端 API 与 `connector_*` 工具**共用同一 `api` facade**（catalog/connect/…），保证「图形页」与「对话」状态一致。
 
 ---
 

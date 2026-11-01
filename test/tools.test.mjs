@@ -15,11 +15,11 @@ test('精简模式只注册两个入口，默认保留全部旧工具且卸载�
   const full = captureTools();
   const compact = captureTools({}, { compact: true });
   assert.equal(full.tools.size, 25);
-  assert.deepEqual([...compact.tools.keys()], ['mcp_connector_discover', 'mcp_connector_session_tools']);
-  assert.equal(compact.tools.has('mcp_connector_configure'), false);
+  assert.deepEqual([...compact.tools.keys()], ['connector_discover', 'connector_session_tools']);
+  assert.equal(compact.tools.has('connector_configure'), false);
   const schemas = (tools) => JSON.stringify([...tools.values()].map(({ name, description, parameters }) => ({ name, description, parameters })));
   assert.ok(schemas(compact.tools).length < schemas(full.tools).length * 0.35, '仅比较 schema 字符数，不声称 token 数');
-  assert.deepEqual(compact.tools.get('mcp_connector_session_tools').parameters, full.tools.get('mcp_connector_session_tools').parameters);
+  assert.deepEqual(compact.tools.get('connector_session_tools').parameters, full.tools.get('connector_session_tools').parameters);
   compact.dispose();
   full.dispose();
   assert.equal(compact.tools.size, 0);
@@ -33,7 +33,7 @@ test('精简发现按固定白名单分派，保留原始结果渲染与工作�
     return { ok: true, message: name, detail: { items: [], tool: { description: 'demo', inputSchema: { type: 'object' } }, missing: undefined } };
   }]));
   const { tools } = captureTools(api, { compact: true });
-  const discover = tools.get('mcp_connector_discover');
+  const discover = tools.get('connector_discover');
   for (const [action, args, method] of [
     ['catalog', { keyword: '企查查', category: '企业数据', workspaceId: 'ws' }, 'catalog'],
     ['status', { workspaceId: 'ws' }, 'status'],
@@ -53,7 +53,7 @@ test('精简发现按固定白名单分派，保留原始结果渲染与工作�
 test('精简入口拒绝未知操作、跨 action 参数和非法值，不调用任何 API', async () => {
   const api = new Proxy({}, { get() { assert.fail('invalid input reached API'); } });
   const { tools } = captureTools(api, { compact: true });
-  const discover = tools.get('mcp_connector_discover');
+  const discover = tools.get('connector_discover');
   for (const input of [
     null, [], {}, { action: { toString: 'invalid' } }, { action: ['status'] },
     { action: 'configure' }, { action: 'disconnect' }, { action: 'constructor' },
@@ -78,7 +78,7 @@ test('精简模式保留会话激活原有参数和可信执行上下文，不�
     assert.equal(context, exec);
     return { ok: false, message: '需要用户明确确认' };
   } }, { compact: true });
-  const result = await tools.get('mcp_connector_session_tools').execute(args, exec);
+  const result = await tools.get('connector_session_tools').execute(args, exec);
   assert.equal(result.ok, false);
   assert.match(result.message, /明确确认/);
 });
@@ -86,7 +86,7 @@ test('精简模式保留会话激活原有参数和可信执行上下文，不�
 test('精简工具注册中途失败会释放已注册入口', () => {
   let cleaned = 0;
   assert.throws(() => registerTools({ tools: { register(def) {
-    if (def.name === 'mcp_connector_session_tools') throw new Error('registration failure');
+    if (def.name === 'connector_session_tools') throw new Error('registration failure');
     return () => { cleaned++; };
   } } }, {}, { compact: true }), /registration failure/);
   assert.equal(cleaned, 1);
@@ -102,7 +102,7 @@ test('所有自有工具入参为 object 且不含 provider 拒绝的顶层组�
       assert.equal(Object.hasOwn(def.parameters, keyword), false, `${def.name}: ${keyword}`);
     }
   }
-  const configure = defs.find((def) => def.name === 'mcp_connector_configure');
+  const configure = defs.find((def) => def.name === 'connector_configure');
   assert.equal(configure.parameters.additionalProperties, false);
   assert.deepEqual(configure.parameters.properties.transport.enum, ['streamable-http', 'stdio', 'sse']);
   assert.match(configure.description, /参数三选一/);
@@ -152,9 +152,9 @@ test('所有对话工具在 execute 边界清洗 transport 专属 undefined 字�
   };
 
   const dispose = registerTools(ctx, api);
-  const catalog = await tools.get('mcp_connector_catalog').execute({});
-  const status = await tools.get('mcp_connector_status').execute({});
-  const health = await tools.get('mcp_connector_health_check').execute({});
+  const catalog = await tools.get('connector_catalog').execute({});
+  const status = await tools.get('connector_status').execute({});
+  const health = await tools.get('connector_health_check').execute({});
 
   assert.equal(catalog.detail.items[0].url, null);
   assert.equal(status.detail.items[0].command, null);
@@ -174,7 +174,7 @@ test('健康检查工具向模型渲染状态、阶段、代码和建议', () =>
     },
   };
   const dispose = registerTools(ctx, {});
-  const rendered = tools.get('mcp_connector_health_check').output.render({}, {
+  const rendered = tools.get('connector_health_check').output.render({}, {
     ok: true,
     message: '已检查 1 个连接器：1 个状态未知',
     detail: {
@@ -214,16 +214,16 @@ test('工具搜索与详情是只读发现工具，并渲染缓存来源和参�
     },
   };
   const dispose = registerTools(ctx, api);
-  const searched = await tools.get('mcp_connector_tool_search').execute({ query: 'lookup', limit: 5 });
-  assert.match(tools.get('mcp_connector_tool_search').output.render({}, searched)[0].text, /demo\/search\/lookup/);
-  const detailed = await tools.get('mcp_connector_tool_detail').execute({ toolName: 'lookup', serverName: 'search' });
-  assert.match(tools.get('mcp_connector_tool_detail').output.render({}, detailed)[0].text, /"type": "object"/);
+  const searched = await tools.get('connector_tool_search').execute({ query: 'lookup', limit: 5 });
+  assert.match(tools.get('connector_tool_search').output.render({}, searched)[0].text, /demo\/search\/lookup/);
+  const detailed = await tools.get('connector_tool_detail').execute({ toolName: 'lookup', serverName: 'search' });
+  assert.match(tools.get('connector_tool_detail').output.render({}, detailed)[0].text, /"type": "object"/);
   assert.deepEqual(calls, [
     ['search', { query: 'lookup', limit: 5 }],
     ['detail', { toolName: 'lookup', serverName: 'search' }],
   ]);
-  assert.match(tools.get('mcp_connector_tool_search').description, /不调用目标 MCP 工具/);
-  assert.match(tools.get('mcp_connector_tool_detail').description, /不执行目标 MCP 工具/);
+  assert.match(tools.get('connector_tool_search').description, /不调用目标 MCP 工具/);
+  assert.match(tools.get('connector_tool_detail').description, /不执行目标 MCP 工具/);
   dispose();
 });
 
@@ -240,13 +240,13 @@ test('脱敏导出与快照工具只渲染公开结果', async () => {
   };
   const dispose = registerTools(ctx, api);
 
-  const exported = await tools.get('mcp_connector_export_config').execute({});
-  const exportRendered = tools.get('mcp_connector_export_config').output.render({}, exported)[0].text;
+  const exported = await tools.get('connector_export_config').execute({});
+  const exportRendered = tools.get('connector_export_config').output.render({}, exported)[0].text;
   assert.match(exportRendered, /```json/);
   assert.match(exportRendered, /"redacted":true/);
 
-  const snapshots = await tools.get('mcp_connector_snapshot').execute({ action: 'list' });
-  const snapshotRendered = tools.get('mcp_connector_snapshot').output.render({}, snapshots)[0].text;
+  const snapshots = await tools.get('connector_snapshot').execute({ action: 'list' });
+  const snapshotRendered = tools.get('connector_snapshot').output.render({}, snapshots)[0].text;
   assert.match(snapshotRendered, /snapshot-1/);
   assert.doesNotMatch(snapshotRendered, /token|secret/i);
   dispose();
@@ -263,10 +263,10 @@ test('重命名工具仅传递连接 key 和新显示名', async () => {
     },
   };
   const dispose = registerTools(ctx, api);
-  const result = await tools.get('mcp_connector_rename').execute({ key: 'json-demo', name: '生产数据' });
+  const result = await tools.get('connector_rename').execute({ key: 'json-demo', name: '生产数据' });
   assert.equal(result.ok, true);
   assert.deepEqual(calls, [{ key: 'json-demo', name: '生产数据' }]);
-  assert.equal(tools.get('mcp_connector_rename').parameters.additionalProperties, false);
+  assert.equal(tools.get('connector_rename').parameters.additionalProperties, false);
   dispose();
 });
 
@@ -284,14 +284,14 @@ test('安全编辑工具读取脱敏 JSON 并按 key 原子更新', async () => 
     },
   };
   const dispose = registerTools(ctx, api);
-  const editable = await tools.get('mcp_connector_get_editable_config').execute({ key: 'json-demo' });
+  const editable = await tools.get('connector_get_editable_config').execute({ key: 'json-demo' });
   assert.doesNotMatch(editable.detail.json, /real-secret/);
-  assert.match(tools.get('mcp_connector_get_editable_config').output.render({}, editable)[0].text, /<KEEP_EXISTING>/);
+  assert.match(tools.get('connector_get_editable_config').output.render({}, editable)[0].text, /<KEEP_EXISTING>/);
   const json = '{"connections":[]}';
-  const updated = await tools.get('mcp_connector_reconfigure').execute({ key: 'json-demo', json });
+  const updated = await tools.get('connector_reconfigure').execute({ key: 'json-demo', json });
   assert.equal(updated.ok, true);
   assert.deepEqual(calls, [{ key: 'json-demo', json }]);
-  assert.equal(tools.get('mcp_connector_reconfigure').parameters.additionalProperties, false);
+  assert.equal(tools.get('connector_reconfigure').parameters.additionalProperties, false);
   dispose();
 });
 
@@ -306,7 +306,7 @@ test('治理工具支持 list/preview/apply/rollback 并渲染规则来源', asy
     rollbackPolicy: async (revision) => { calls.push(['rollback', revision]); return { ok: true, message: 'rollback' }; },
   };
   const dispose = registerTools(ctx, api);
-  const policy = tools.get('mcp_connector_policy');
+  const policy = tools.get('connector_policy');
   const listed = await policy.execute({ action: 'list' });
   assert.match(policy.output.render({}, listed)[0].text, /acme\/search\/remove · deny · 已生效/);
   await policy.execute({ action: 'preview', scope: 'tool', effect: 'deny', connectorId: 'acme', serverName: 'search', toolName: 'remove' });
@@ -328,7 +328,7 @@ test('作用域工具支持 context/preview/apply/rollback 且不传递凭据', 
     rollbackConnectionScope: async (revision, expected) => { calls.push(['rollback', revision, expected]); return { ok: true, message: 'rollback' }; },
   };
   const dispose = registerTools(ctx, api);
-  const scope = tools.get('mcp_connector_scope');
+  const scope = tools.get('connector_scope');
   await scope.execute({ action: 'context', workspaceId: 'workspace-1' });
   await scope.execute({ action: 'preview', key: 'demo', mode: 'copy', targetScope: 'global' });
   await scope.execute({ action: 'apply', key: 'demo', mode: 'move', targetScope: 'project', targetWorkspaceId: 'workspace-1', expectedRevision: 2 });
@@ -350,7 +350,7 @@ test('会话工具元工具传递 Agent 上下文并强调精确预览与确认'
     },
   };
   const dispose = registerTools(ctx, api);
-  const tool = tools.get('mcp_connector_session_tools');
+  const tool = tools.get('connector_session_tools');
   const agent = { id: 'session-a' };
   const result = await tool.execute({
     action: 'activate', connectionKey: 'demo', publicNames: ['mcp__demo__read'],

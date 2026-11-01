@@ -110,7 +110,7 @@ Desktop 需要完全退出并重新启动应用；Web 需要停止原 `dsh web` 
 - 插件版本与一键更新：版本发现独立于安装来源；页面通过 Update Provider 适配层探测安全更新能力。DSH Market API v1 是首个适配器，支持进度、稳定失败码、回滚及按宿主能力提供的重启/刷新操作；无可用 Provider 时回退到当前插件市场或 npm。
 - Registry 工具链：Schema/唯一性/密钥审计、MCP/OAuth 无凭据探针、每周健康巡检。
 - 平滑迁移：显式扫描并复制两个旧企查查 OAuth 插件授权；检测到旧插件仍启用并管理同名 Server 时阻断重复连接，避免凭据相互覆盖。
-- 对话工具：`mcp_connector_catalog`、`connect`、`configure`、`import_json`、`export_config`、`snapshot`、`install_from_url`、`status`、`scope`、`health_check`、`policy`、`set_enabled`、`session_tools`、`disconnect`、`refresh_catalog`、`publish`、`tools_list`、`tool_search`、`tool_detail`。搜索/详情只做渐进式能力发现，不执行目标 MCP 工具。
+- 对话工具：`connector_catalog`、`connect`、`configure`、`import_json`、`export_config`、`snapshot`、`install_from_url`、`status`、`scope`、`health_check`、`policy`、`set_enabled`、`session_tools`、`disconnect`、`refresh_catalog`、`publish`、`tools_list`、`tool_search`、`tool_detail`。搜索/详情只做渐进式能力发现，不执行目标 MCP 工具。
 
 <!-- catalog-stats:start -->
 截至 2026-10-24，公共 Registry 已发布 112 条连接器描述；与随包的 4 张企查查卡片合并去重后，市场页可浏览 116 张卡片，覆盖企业数据、金融投资、法律合规、开发工具、办公协作、调研分析、设计创意、效率工具、其他 9 类。推荐位严格保留 4 张企查查卡片、北大法宝和 Wind，共 6 张；其他连接器按业务分类展示。Registry 可独立持续更新，实际数量以客户端刷新后的市场页签徽标和上方实时统计徽标为准。
@@ -205,7 +205,7 @@ Bundle 默认配置位于 `cordis.patch.yml`：
 
 `compactManagementTools` 默认为 `false`，兼容原有对话管理工具。希望降低管理工具上下文开销时，可在插件配置中设为 `true` 并重载插件（必要时重启 DSH），下一次推理使用新工具集：
 
-- 只注册 `mcp_connector_discover`（市场、连接状态、缓存工具搜索/详情）和 `mcp_connector_session_tools`（原有会话工具可见性管理）两个入口。
+- 只注册 `connector_discover`（市场、连接状态、缓存工具搜索/详情）和 `connector_session_tools`（原有会话工具可见性管理）两个入口。
 - 连接、授权、编辑、导入、快照、迁移等管理操作使用 **MCP连接器界面**；精简模式没有任意工具执行代理，也不自动加载全部管理工具。纯对话部署或依赖旧工具名的自动化应保持 `false`。
 - 此开关不减少已连接服务的业务工具数量，不停用连接、不迁移凭据、不修改作用域/治理规则。业务工具需要按需可见时，仍使用原有“按会话启用”。会话确认、TTL 与 Host 审批保持不变。
 - 例如发现入口可用 `{"action":"search","query":"天气","limit":5}`；查询连接状态可用 `{"action":"status"}`。详情使用 `action=detail` 和必填 `toolName`，市场搜索使用 `action=catalog` 与可选 `keyword`。

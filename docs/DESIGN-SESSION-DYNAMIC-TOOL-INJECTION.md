@@ -182,7 +182,7 @@ deny(agent)
 
 ### 7.1 对话元工具
 
-新增 `mcp_connector_session_tools`，它自身始终可见，但只能管理 MCP 工具的会话可见性，不能调用业务工具。建议 action：
+新增 `connector_session_tools`，它自身始终可见，但只能管理 MCP 工具的会话可见性，不能调用业务工具。建议 action：
 
 - `status`：当前会话模式、激活项、过期时间和 Host 能力；
 - `search`：在缓存的工具目录中按连接器、Server、工具名和描述检索；

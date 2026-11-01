@@ -57,7 +57,7 @@ for (const delivery of ['native', 'microtask', 'immediate']) {
               execute: async () => ({}),
             });
             for (let i = 0; i < 161; i += 1) {
-              register(i < 25 ? `mcp_connector_fixture_${i}` : `mcp__acme__fixture_${i}`);
+              register(i < 25 ? `connector_fixture_${i}` : `mcp__acme__fixture_${i}`);
             }
             // Each scope has the same public ownership semantics as an Agent,
             // but does not run a model or instantiate the Desktop UI.

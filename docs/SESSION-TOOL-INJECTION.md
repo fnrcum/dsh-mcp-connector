@@ -13,7 +13,7 @@
 
 ## 在对话中激活
 
-对话元工具 `mcp_connector_session_tools` 支持：
+对话元工具 `connector_session_tools` 支持：
 
 1. `status`：查看当前会话的 revision、激活工具和到期时间。
 2. `search`：从最后成功工具缓存中搜索可激活的精确 `publicName`；不会执行业务工具。

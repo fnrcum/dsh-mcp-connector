@@ -4,7 +4,7 @@ MCP连接器提供“可携带脱敏导出”和“当前 profile 本机快照�
 
 ## 脱敏导出
 
-在“已安装”页点击“配置备份”，可复制或下载 JSON；对话中可调用 `mcp_connector_export_config`。
+在“已安装”页点击“配置备份”，可复制或下载 JSON；对话中可调用 `connector_export_config`。
 
 | 配置内容 | 导出行为 |
 |---|---|
@@ -19,7 +19,7 @@ MCP连接器提供“可携带脱敏导出”和“当前 profile 本机快照�
 
 ## 本机配置快照
 
-连接、配置、JSON 导入、启停和断开前会先保存受影响 key 的状态；也可在页面手动创建全量当前快照，或调用 `mcp_connector_snapshot`：
+连接、配置、JSON 导入、启停和断开前会先保存受影响 key 的状态；也可在页面手动创建全量当前快照，或调用 `connector_snapshot`：
 
 - `list`：列出公开摘要；
 - `create`：手动创建；

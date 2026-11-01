@@ -133,7 +133,7 @@ const Config = z.union([
 | 文件 | 位置 | 现状 |
 |------|------|------|
 | `registry/schema/connector.schema.json` | `servers.items` | `transport: enum ['streamable-http', 'sse']`，`url` required |
-| `lib/tools.js` | `mcp_connector_configure` L119 | `transport: enum ['streamable-http', 'sse']` |
+| `lib/tools.js` | `connector_configure` L119 | `transport: enum ['streamable-http', 'sse']` |
 
 ---
 
@@ -504,7 +504,7 @@ if (connector.auth.mode === 'none') {
 
 ---
 
-### 5.6 `lib/tools.js` —— `mcp_connector_configure` 工具定义
+### 5.6 `lib/tools.js` —— `connector_configure` 工具定义
 
 L119 的 `transport` 枚举改后，加 stdio 字段：
 

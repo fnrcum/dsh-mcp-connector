@@ -83,7 +83,23 @@ export const EN = Object.freeze({
   "已生成本地安全预览，尚未复制、下载或带入会话。": "Local safe preview generated. Nothing has been copied, downloaded, or added to a session.",
   "已复制安全模板 JSON。": "Safe template JSON copied.",
   "已下载安全模板 JSON。": "Safe template JSON downloaded.",
-  "已将安全 JSON 带入新会话草稿；未自动发送。": "Safe JSON added to a new session draft; not sent automatically."
+  "已将安全 JSON 带入新会话草稿；未自动发送。": "Safe JSON added to a new session draft; not sent automatically.",
+  "查询一家企业的简介": "Look up a company profile",
+  "安装并确认插件版本": "Install and confirm the plugin version",
+  "确认连接与授权范围": "Confirm the connection and authorization scope",
+  "发现并核对 get_company_profile": "Discover and verify get_company_profile",
+  "完成一次获准的只读业务调用": "Complete one approved read-only business call",
+  "2026-10-16 的历史记录只证明当时已有连接的一次只读调用成功，不代表当前版本或首次授权已经验收。": "The 2026-10-16 record only proves one read-only call succeeded on an existing connection at that time; it does not mean the current version or first-time authorization has been validated.",
+  "迁移一条已有 mcpServers JSON 配置": "Migrate an existing mcpServers JSON configuration",
+  "保存脱敏备份并导入单条配置": "Save a redacted backup and import a single configuration",
+  "核对范围、工具发现与 Host 注册": "Verify scope, tool discovery, and Host registration",
+  "仓库已有导入逻辑与隔离测试，但没有获授权环境中“导入真实配置后完成业务调用”的当前端到端证据。": "The repository has import logic and isolation tests, but no current end-to-end evidence of importing a real configuration and completing a business call in an authorized environment.",
+  "在发现失败后定位工具并恢复发现": "Locate tools and restore discovery after a failed discovery",
+  "核对范围、来源与最后成功缓存": "Verify scope, source, and the last successful cache",
+  "按诊断检查连接或重新发现工具": "Follow the diagnostics to check the connection or rediscover tools",
+  "隔离测试覆盖失败保留缓存与恢复后重新发现；尚无不改动既有真实连接的当前业务调用验收。": "Isolation tests cover keeping the cache on failure and rediscovering after recovery; there is no current business-call acceptance that leaves existing real connections untouched.",
+  "导入前必须在本机重新填写所有 <REDACTED:REENTER> 值并显式确认；目录引用请回到市场重新授权或确认启动。": "Before importing, re-enter every <REDACTED:REENTER> value on this machine and confirm explicitly; for catalog references, authorize again from the marketplace or confirm startup.",
+  "自定义 MCP 连接": "Custom MCP connection",
 });
 export function t(message, params) {
   const english = typeof document !== 'undefined' && /^en(?:-|$)/i.test(document.documentElement?.lang ?? '');

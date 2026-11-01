@@ -115,7 +115,7 @@ OAuth 一键连接要求服务商支持标准 OAuth 2.1/PKCE 和公开元数据�
 
 连接成功后，工具按 `mcp__<serverName>__*` 前缀提供给模型。工具清单来自服务端，实际数量会随服务商权限和版本变化。成功发现后，插件会在当前 profile 保存一份安全裁剪的工具元数据；实时发现失败时仍显示这份“最后成功缓存”，但保持连接失败/未知状态并标注缓存时间，超过 24 小时还会显示陈旧提示。详情与“已安装”列表会展示最近一次诊断的阶段、稳定错误码、说明、建议动作和最近成功时间。
 
-对话中可用 `mcp_connector_tool_search` 按名称、标题或描述搜索缓存，再用 `mcp_connector_tool_detail` 精确读取某个工具的参数 schema。两者只用于发现，不代理或执行 MCP 调用。
+对话中可用 `connector_tool_search` 按名称、标题或描述搜索缓存，再用 `connector_tool_detail` 精确读取某个工具的参数 schema。两者只用于发现，不代理或执行 MCP 调用。
 
 ### 5.1 工具工作台：统一查找工具
 
@@ -232,7 +232,7 @@ OAuth 断开时，插件会尽力调用服务商的撤销端点；无撤销端�
 
 “始终注入”是旧连接的兼容默认值。当某条连接工具较多、但只在少数会话使用时，可在“已安装”将它改为“按会话启用（实验）”。连接和 OAuth/API Key 生命周期保持不变，Host 只是在每个 Agent 中默认隐藏该连接的业务工具。
 
-在对话中，`mcp_connector_session_tools` 先使用 `search` 定位精确 `publicName`，再使用 `preview-activate` 获取 revision；只有用户明确指定后才可 `activate`。默认 TTL 为 30 分钟，可设为 1–30 分钟；激活从下一次模型推理边界生效。会话结束、过期、插件重启或 DSH 重启后均回到休眠状态。
+在对话中，`connector_session_tools` 先使用 `search` 定位精确 `publicName`，再使用 `preview-activate` 获取 revision；只有用户明确指定后才可 `activate`。默认 TTL 为 30 分钟，可设为 1–30 分钟；激活从下一次模型推理边界生效。会话结束、过期、插件重启或 DSH 重启后均回到休眠状态。
 
 会话激活不能覆盖 project/global 范围、Connection/Server/Tool `deny`、连接停用或 Host 审批。插件不会保存会话正文、触发词或工具参数，当前版本也不根据关键词自动激活。完整流程与排障见[按会话启用说明](SESSION-TOOL-INJECTION.md)。
 

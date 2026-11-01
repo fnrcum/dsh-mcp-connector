@@ -55,7 +55,7 @@ Desktop 和 Web 使用同一个 Host API：
 
 ## 6. 对话工具
 
-`mcp_connector_scope` 支持：
+`connector_scope` 支持：
 
 - `action=context`：读取 Workspace、Host 能力和 revision；
 - `action=preview`：预览 `copy`/`move` 及 Server/工具影响；

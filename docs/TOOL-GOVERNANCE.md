@@ -36,7 +36,7 @@
 - 用户确认后才用同一 revision 提交；
 - 如果期间策略已经变化，提交失败并要求重新预览。
 
-每次有效提交都会保存上一 revision 的规则快照，最多保留 20 份。页面“撤销最近变更”或 `mcp_connector_policy` 的 `rollback` 操作可以恢复历史内容；回滚本身生成一个新的 revision，不改写历史。
+每次有效提交都会保存上一 revision 的规则快照，最多保留 20 份。页面“撤销最近变更”或 `connector_policy` 的 `rollback` 操作可以恢复历史内容；回滚本身生成一个新的 revision，不改写历史。
 
 ## 4. 工具增删、重命名与未知状态
 
@@ -57,7 +57,7 @@ Tool 规则同时保存 MCP 原始工具名和 Host 实际注册的 public name�
 - 每个已观察 Tool 的最终状态、策略来源和继承关系；
 - revision 与最近一次策略回滚入口。
 
-对话中使用 `mcp_connector_policy`：
+对话中使用 `connector_policy`：
 
 - `action=list`：列出规则、状态、Host 能力和历史 revision；
 - `action=preview`：只读预览；
