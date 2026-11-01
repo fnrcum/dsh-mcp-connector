@@ -762,6 +762,11 @@
       "未观察 · {desired}": "Not observed · {desired}",
       "{state} · {source}": "{state} · {source}",
       "策略": "Policy",
+      "默认策略": "Default policy",
+      "Server 策略": "Server policy",
+      "Tool 策略": "Tool policy",
+      "连接已停用": "Connection disabled",
+      "：": ":",
       "已禁用": "Disabled",
       "已允许": "Allowed",
       "规则拟拒绝": "Rule would deny",
@@ -1207,6 +1212,23 @@
     && !Object.hasOwn(MESSAGES[ACTIVE_LOCALE], msgid)
     && !(Object.hasOwn(LABELS, msgid) && Object.hasOwn(MESSAGES[ACTIVE_LOCALE], LABELS[msgid]));
 
+  const POLICY_SOURCE_MSGIDS = Object.freeze({
+    default: '默认策略',
+    connection: '连接策略',
+    server: 'Server 策略',
+    tool: 'Tool 策略',
+    lifecycle: '连接已停用',
+  });
+
+  // Host 预本地化的展示标签（如 scope.label、connectionLabel）可能仍是 Host
+  // 语言；面板按自己的语言重译，找不到 msgid 时回退原文。
+  function localizeHostText(value) {
+    if (typeof value !== 'string' || value.length === 0) return '';
+    const separator = value.indexOf('：');
+    if (separator === -1) return t(value);
+    return `${t(value.slice(0, separator))}${t('：')}${value.slice(separator + 1)}`;
+  }
+
   const MCP_JSON_EXAMPLE = JSON.stringify({
     mcpServers: {
       'my-server': {
@@ -1598,7 +1620,7 @@
     const projectOptions = availableWorkspaces.map((workspace) => {
       const optionValue = `project:${workspace.workspaceId}`;
       const prefix = t(workspace.workspaceId === currentWorkspace?.workspaceId ? '当前项目' : '项目');
-      return `<option value="${esc(optionValue)}" ${value === optionValue ? 'selected' : ''}>${esc(prefix)}：${esc(workspace.title)}</option>`;
+      return `<option value="${esc(optionValue)}" ${value === optionValue ? 'selected' : ''}>${esc(prefix)}${t('：')}${esc(workspace.title)}</option>`;
     }).join('');
     const unavailable = projectOptions ? '' : `<option value="" disabled>${t('暂无可用 Workspace')}</option>`;
     return `<label for="${esc(id)}">${t('连接范围')}</label><select id="${esc(id)}">${projectOptions}${unavailable}<option value="global" ${value === 'global' ? 'selected' : ''}>${t('所有项目（全局）')}</option></select><div class="field-help">${t('可选择任一 Workspace；项目范围只在该 Workspace 的 Agent 中可见。全局范围由所有 Workspace 继承，范围绑定不保存或复制凭据。')}</div>`;
@@ -1735,7 +1757,7 @@
       return `<span class="policy-badge unknown" title="${esc(t('当前 Host 未观察到该工具，不能报告为已禁用或健康'))}">${t('未观察 · {desired}', { desired })}</span>`;
     }
     const denied = policy.finalState === 'denied';
-    const label = t('{state} · {source}', { state: t(denied ? '已禁用' : '已允许'), source: policy.sourceLabel || policy.source || t('策略') });
+    const label = t('{state} · {source}', { state: t(denied ? '已禁用' : '已允许'), source: t(POLICY_SOURCE_MSGIDS[policy.source] || policy.sourceLabel || '策略') });
     return `<span class="policy-badge ${denied ? 'denied' : 'allowed'}" title="${esc(label)}">${esc(label)}</span>`;
   }
 
@@ -1997,12 +2019,12 @@
   function scopeAffectedText(servers) {
     return (servers || []).map((server) => {
       const tools = server.tools || [];
-      if (!tools.length) return `${server.serverName}：${t('工具清单尚未观察')}`;
+      if (!tools.length) return `${server.serverName}${t('：')}${t('工具清单尚未观察')}`;
       const shown = tools.slice(0, SCOPE_TOOLS_INLINE_LIMIT).join(t('、'));
       const rest = tools.length > SCOPE_TOOLS_INLINE_LIMIT
         ? t('、…等共 {count} 个', { count: tools.length })
         : '';
-      return `${server.serverName}：${shown}${rest}`;
+      return `${server.serverName}${t('：')}${shown}${rest}`;
     }).join('\n');
   }
 
@@ -2309,7 +2331,7 @@
     $('#explorer-connection').value = explorerFilter.connectionKey;
     $('#explorer-server').value = explorerFilter.serverName;
     $('#explorer-status').value = explorerFilter.status;
-    $('#explorer-summary').textContent = t('{scope} · {connections} 条连接 · 匹配 {tools} 个工具 · 显示 {shown} 个', { scope: explorerData.scopeLabel, connections: connections.length, tools: total, shown: items.length });
+    $('#explorer-summary').textContent = t('{scope} · {connections} 条连接 · 匹配 {tools} 个工具 · 显示 {shown} 个', { scope: localizeHostText(explorerData.scopeLabel), connections: connections.length, tools: total, shown: items.length });
     $('#explorer-connections').innerHTML = `<details ${explorerFilter.connectionKey || !total ? 'open' : ''}><summary>${t('连接状态与故障处理（{count}）', { count: selectedConnections.length })}</summary>${selectedConnections.map((c) => `<div class="explorer-card"><strong>${esc(c.connectionName)}</strong><div>${esc(c.serverName)} · ${esc(explorerStatusLabel(c.status))} · ${t('缓存 {count} 个工具', { count: c.toolCount })}</div><div class="hint">${t('最近发现：{observed}；最后成功：{success}{stale}{truncated}', { observed: esc(formatObserved(c.checkedAt)), success: esc(formatObserved(c.observedAt)), stale: c.stale ? t(' · 缓存超过 24 小时') : '', truncated: c.cacheTruncated ? t(' · 缓存清单已截断') : '' })}</div>${c.diagnostic ? `<div>${t('{stage}：{message}', { stage: esc(c.diagnostic.stageLabel), message: esc(c.diagnostic.message) })}<br>${t('建议：{action}', { action: esc(c.diagnostic.action) })}</div>` : ''}${c.retryReason === 'auth' ? `<p>${t('鉴权失败已暂停后台重试，请到已安装页更新凭据或重新授权。')}</p>` : c.nextDiscoveryAt ? `<p class="hint">${t('下次后台发现不早于：{at}（页面保持连接时）', { at: esc(formatObserved(c.nextDiscoveryAt)) })}</p>` : ''}<div class="m-actions"><button class="btn ghost" data-explorer-action="discover" data-key="${esc(c.connectionKey)}" ${explorerBusy.has(c.connectionKey) ? 'disabled' : ''}>${t('重新发现工具')}</button><button class="btn ghost" data-explorer-action="check" data-key="${esc(c.connectionKey)}" ${explorerBusy.has(c.connectionKey) ? 'disabled' : ''}>${t('检查连接')}</button></div></div>`).join('') || `<p>${t('当前筛选下没有连接。')}</p>`}</details>`;
     $('#explorer-results').innerHTML = items.map((item, index) => `<article class="explorer-card"><strong>${esc(item.name)}</strong>${item.title !== item.name ? `<div>${esc(item.title)}</div>` : ''}<p>${esc(item.description || t('暂无描述'))}</p><div class="hint">${t('来源：{connector} / {connection} / {server}', { connector: esc(item.connection.connectorName), connection: esc(item.connection.connectionName), server: esc(item.serverName) })}<br>${esc(explorerStatusLabel(item.connection.status))} · ${t('最后成功缓存 {at}', { at: esc(formatObserved(item.observedAt)) })}${item.stale ? t(' · 已超过 24 小时') : ''}</div><button class="btn ghost" data-explorer-detail="${index}">${t('参数详情')}</button></article>`).join('') || `<p class="empty">${t(connections.length ? '没有匹配工具。请调整关键词或筛选；也可展开连接状态检查是否尚未发现或读取失败。' : '当前范围没有已启用连接。请先添加连接，或选择对应工作区。')}</p>`;
     $('#explorer-pages').innerHTML = `<button class="btn ghost" data-explorer-page="prev" ${explorerOffset === 0 ? 'disabled' : ''}>${t('上一页')}</button><span>${Math.floor(explorerOffset / 20) + 1} / ${Math.max(1, Math.ceil(total / 20))}</span><button class="btn ghost" data-explorer-page="next" ${explorerOffset + 20 >= total ? 'disabled' : ''}>${t('下一页')}</button>`;
@@ -2394,7 +2416,7 @@
     const healthLabels = { healthy: '已连接', unknown: '状态未知', configured: '已配置', reauth: '需重新授权', recovering: '自动重试中', degraded: '部分异常', unavailable: '连接异常', disabled: '已停用' };
     const healthClass = r.connectionState === 'healthy' ? 'pass' : ['reauth', 'recovering', 'degraded'].includes(r.connectionState) ? 'partial' : r.connectionState === 'unavailable' ? 'fail' : '';
     const healthBadge = `<span class="badge ${healthClass}">${esc(t(healthLabels[r.connectionState] || '状态未知'))}</span>`;
-    const scopeBadge = `<span class="badge">${esc(t(r.scope?.label || '全局'))}</span>`;
+    const scopeBadge = `<span class="badge">${esc(localizeHostText(r.scope?.label || '全局'))}</span>`;
     const insecureNetworkBadge = r.insecurePrivateNetwork === true ? `<span class="badge partial">${t('局域网 HTTP 风险已确认')}</span>` : '';
     const enabled = r.enabled !== false;
     const injectionMode = r.injectionMode === 'session' ? 'session' : 'always';
@@ -3087,7 +3109,7 @@
       $('#detail-name').textContent = d.name || '';
       const initialStateLabel = incomplete
         ? t('待补充 {count} 个服务', { count: d.missingServers?.length || 1 })
-        : (d.connectionLabel || t(d.connected?.length ? '已配置' : '未连接'));
+        : t(d.connectionLabel || (d.connected?.length ? '已配置' : '未连接'));
       $('#detail-vendor').textContent = d.vendor ? `${d.vendor} · ${initialStateLabel} ${t('{count} 个服务', { count: d.connected?.length || 0 })}` : `${initialStateLabel} ${t('{count} 个服务', { count: d.connected?.length || 0 })}`;
       $('#detail-desc').textContent = d.description || d.summary || '';
       $('#detail-desc').textContent += '\n' + connectionLabels(d).join(' · ');

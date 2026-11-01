@@ -9,6 +9,7 @@
 - 修复使用 Claude 模型时整轮请求失败的问题：25 个对话工具原名以 `mcp_` 开头且紧跟非下划线字符，Claude API 会把这种不合规工具名误报为 400“You're out of extra usage”，导致只要本插件出现在工具列表中，Claude 就无法正常应答。全部工具改用 Claude 安全的 `connector_*` 命名（如 `connector_catalog`、`connector_configure`），精简模式入口为 `connector_discover` 与 `connector_session_tools`；新增 `test/tool-names.test.mjs` 回归测试，禁止任何已注册工具名再次落入该前缀。
 - 同步上游 `v0.2.77`–`v0.2.92`（双语文案体系、面板中英切换、多工作区作用域、安全连接模板、本地连接统计、分类导航箭头等），保留本分支既有英文译文并补齐上游新增文案。
 - 补齐英文界面遗漏译文：错误诊断建议句（`guidanceFor` 以变量形式查表导致漏译）、首次使用示例提示词、共享体验模板的任务/步骤/限制文案（渲染时翻译）、安全连接模板说明与默认连接名、三个弹窗的「关闭」按钮、详情工具搜索框占位文案；新增 `test/ui-en-coverage.test.mjs` 防止这些字符串回退为中文。
+- 修复英文界面中 Host 预本地化标签仍显示中文的问题：策略来源（`默认策略` / `Server 策略` / `Tool 策略` / `连接已停用`）、连接状态（`未连接`）、工作区与作用域标签（`项目：`）及英文冒号统一经面板字典重译；新增 `POLICY_SOURCE_MSGIDS` 与 `localizeHostText`，并扩展 `test/ui-en-coverage.test.mjs` 覆盖这些宿主组合标签。
 
 ### Changed
 
@@ -19,8 +20,9 @@
 
 - `node --test test/tool-names.test.mjs`：25 个工具与精简模式 2 个入口均不以 `mcp_` + 非下划线字符开头。
 - `node --test test/i18n-completeness.test.mjs test/i18n-untranslated.test.mjs`：22/22 通过。
-- `node --test test/ui-en-coverage.test.mjs`：共享体验模板、安全模板说明/默认名、错误诊断建议句与首次使用提示词均有非空英文译文（0 处残留中文）。
-- 面板中英切换与英文覆盖另经隔离 Chromium Mock 审计（18 个界面状态，未发现新增遗漏译文）。上游 `scripts/check-i18n-ui.mjs` 在 Node 26 headless 下存在分类箭头点击竞态，合入基线同样失败，未作为本分支门禁。
+- `node --test test/ui-en-coverage.test.mjs`：共享体验模板、安全模板说明/默认名、错误诊断建议句、首次使用提示词及 Host 预本地化的策略/连接/作用域标签均有非空英文译文（0 处残留中文）。
+- `node --test test/ui-en-coverage.test.mjs test/i18n-completeness.test.mjs test/i18n-untranslated.test.mjs test/sharing-experience.test.mjs`：35/35 通过。
+- 面板中英切换与英文覆盖另经隔离 Chromium Mock 审计（28 个界面状态）：策略、连接、工作区标签 5 处中文漏译已消除；残余中文均为目录厂商数据、Mock 数据与语言切换按钮（有意保留）。宿主生成的操作结果消息随 Host 语言，属上游请求协议限制。上游 `scripts/check-i18n-ui.mjs` 在 Node 26 headless 下存在分类箭头点击竞态，合入基线同样失败，未作为本分支门禁。
 
 ## [0.2.92] - 2026-11-01
 

@@ -64,3 +64,13 @@ test('panel advice sentences and first-use prompt have English translations', ()
   const value = panelEntry(prompt[1], 'first-use prompt');
   assert.ok(!CJK.test(value), 'first-use prompt is still Chinese in English mode');
 });
+
+test('host-composed policy, scope and connection labels are re-localized by the panel', () => {
+  for (const msgid of ['默认策略', '连接策略', 'Server 策略', 'Tool 策略', '连接已停用', '：']) {
+    const value = panelEntry(msgid, 'host-composed label');
+    assert.ok(!CJK.test(value), `untranslated CJK remains in host-composed label: ${msgid}`);
+  }
+  assert.match(panel, /const POLICY_SOURCE_MSGIDS = Object\.freeze\(\{/, 'policy source codes must map back to msgids');
+  assert.match(panel, /function localizeHostText\(/, 'host labels must be re-localized before rendering');
+  assert.match(panel, /t\(d\.connectionLabel \|\|/, 'connectionLabel must pass through the panel translator');
+});
